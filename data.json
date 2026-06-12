@@ -1,0 +1,60 @@
+{
+  "document_type": "purchase_receipt",
+  "issuer": {
+    "brand": "San Pablo Farmacia",
+    "legal_name": "PHARMA PLUS, S.A. DE C.V.",
+    "rfc": "PPL961114GZ1",
+    "tax_regime": "Régimen General de Ley Personas Morales",
+    "address": {
+      "street": "Av. Río Mixcoac No. 140",
+      "colony": "Acacias",
+      "municipality": "Benito Juárez",
+      "city": "Ciudad de México"
+    }
+  },
+  "store": {
+    "branch": "Zavaleta",
+    "address": "San Judas Tadeo 5141, Local A, Santa Cruz Buenavista, Puebla, Puebla, C.P. 72150",
+    "store_number": "151"
+  },
+  "purchase": {
+    "date": "2026-06-01",
+    "time": "10:22",
+    "items_count": 1,
+    "payment_method": {
+      "type": "Tarjeta",
+      "card_brand": "AMEX",
+      "card_last_digits": "006",
+      "amount": 474.00,
+      "currency": "MXN",
+      "authorization_number": "811762",
+      "affiliation_number": "8381460567",
+      "transaction_id": "60729"
+    },
+    "items": [
+      {
+        "barcode": "8020030095076",
+        "description": "ESOXX-ONE STK 10ML CAJ C/20",
+        "quantity": 1,
+        "unit_price": 558.00,
+        "discount": 84.00,
+        "line_total": 474.00
+      }
+    ],
+    "subtotal": 558.00,
+    "discount_total": 84.00,
+    "total": 474.00,
+    "currency": "MXN"
+  },
+  "invoice_data": {
+    "customer_id": "6500878",
+    "facturacion_folio": "015103202606010060729",
+    "transaction_id": "60729"
+  },
+  "additional_info": {
+    "employee": "MAGDIEL TEOYOTL CERE",
+    "terminal": "MTC",
+    "phone": "8000726722",
+    "invoice_url": "www.farmaciasanpablo.com.mx"
+  }
+}

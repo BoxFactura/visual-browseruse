@@ -1,0 +1,5 @@
+RFC: SOLA851225MZ2
+nombre: Amaury Rafael Soto Licon
+uso de cfdi: gastos en general
+cp: 04030
+email: rsotogm@boxfactura.com
