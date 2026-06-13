@@ -1,0 +1,60 @@
+{
+  "document_type": "purchase_receipt",
+  "issuer": {
+    "brand": "San Pablo Farmacia",
+    "legal_name": "PHARMA PLUS, S.A. DE C.V.",
+    "rfc": "PPL961114GZ1",
+    "tax_regime": "Régimen General de Ley Personas Morales",
+    "address": {
+      "street": "Av. Río Mixcoac No. 140",
+      "colony": "Acacias",
+      "municipality": "Benito Juárez",
+      "city": "Ciudad de México"
+    }
+  },
+  "store": {
+    "branch": "Centro",
+    "address": "Calle Ejemplo 123, Col. Muestra, Ciudad de México, C.P. 01000",
+    "store_number": "099"
+  },
+  "purchase": {
+    "date": "2026-06-01",
+    "time": "12:00",
+    "items_count": 1,
+    "payment_method": {
+      "type": "Tarjeta",
+      "card_brand": "VISA",
+      "card_last_digits": "000",
+      "amount": 100.0,
+      "currency": "MXN",
+      "authorization_number": "000000",
+      "affiliation_number": "0000000000",
+      "transaction_id": "00000"
+    },
+    "items": [
+      {
+        "barcode": "0000000000000",
+        "description": "PRODUCTO DE EJEMPLO",
+        "quantity": 1,
+        "unit_price": 100.0,
+        "discount": 0.0,
+        "line_total": 100.0
+      }
+    ],
+    "subtotal": 100.0,
+    "discount_total": 0.0,
+    "total": 100.0,
+    "currency": "MXN"
+  },
+  "invoice_data": {
+    "customer_id": "0000000",
+    "facturacion_folio": "099000000000000000000",
+    "transaction_id": "00000"
+  },
+  "additional_info": {
+    "employee": "EMPLEADO EJEMPLO",
+    "terminal": "T01",
+    "phone": "8000726722",
+    "invoice_url": "www.farmaciasanpablo.com.mx"
+  }
+}

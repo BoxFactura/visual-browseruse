@@ -102,8 +102,10 @@ Notes:
 
 
 async def main() -> None:
-    ticket = json.loads((BASE / "data.json").read_text(encoding="utf-8"))
-    fiscal = (BASE / "rfc.txt").read_text(encoding="utf-8").strip()
+    # Legacy paths: superseded by facturar.py; kept until Phase 1 parity passes.
+    ticket = json.loads((BASE / "tickets/san-pablo-2026-06-01.json").read_text(encoding="utf-8"))
+    fiscal_data = json.loads((BASE / "fiscal.json").read_text(encoding="utf-8"))
+    fiscal = "\n".join(f"{k}: {v}" for k, v in fiscal_data.items())
 
     # Visible browser so you can watch and take over for the final submit.
     # keep_alive keeps the window open after the agent stops.

@@ -43,3 +43,8 @@ Thumbs.db
 
 # Browser-use
 .browser-use/
+
+# CFDI runner artifacts & PII
+runs/
+fiscal.json
+tickets/
