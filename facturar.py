@@ -102,7 +102,7 @@ def main() -> int:
         print("INVOICE EMITTED — portal confirmation:")
         print(report.get("confirmation", "(see report)"))
         print("=" * 70)
-    if report["status"] == "ready_for_review":
+    if report.get("_held_open"):
         print("=" * 70)
         print(f"STOPPED BEFORE FINAL SUBMIT — review the open browser window, then")
         print(f"click '{report.get('human_next_button', guide.stop_before_labels[0])}' yourself.")
@@ -112,6 +112,8 @@ def main() -> int:
                 input("Press Enter here to close the browser when you're done... ")
         except (EOFError, KeyboardInterrupt):
             pass
+    elif report["status"] == "ready_for_review":
+        print("form filled and stopped before submit (browser closed; rerun headed to verify).")
 
     return STATUS_EXIT_CODES.get(report["status"], 5)
 

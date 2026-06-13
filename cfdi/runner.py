@@ -166,10 +166,22 @@ def run_agent(guide: Guide, ticket: dict, fiscal: dict, *, headless: bool, model
         register_new_step_callback=trace.callback if trace else None,
     )
     assert_guards(tools, auto_submit=auto_submit)
+    return asyncio.run(_drive(agent, browser, guide, headless))
 
+
+async def _safe_kill(browser) -> None:
+    """Close the browser, swallowing errors — a failed kill must not mask a result."""
     try:
-        history = asyncio.run(agent.run(max_steps=40))
+        await browser.kill()
+    except Exception:
+        pass
+
+
+async def _drive(agent: Agent, browser: Browser, guide: Guide, headless: bool) -> dict:
+    try:
+        history = await agent.run(max_steps=40)
     except Exception as exc:  # browser/profile launch failures land here
+        await _safe_kill(browser)
         message = str(exc)
         if "Failed to open a new tab" in message or "CDP" in message:
             message = (
@@ -178,7 +190,15 @@ def run_agent(guide: Guide, ticket: dict, fiscal: dict, *, headless: bool, model
             )
         return {"status": "aborted", "error": message}
 
-    return _report_from_history(history, guide)
+    report = _report_from_history(history, guide)
+    # Keep the window open ONLY when a human will act on it (headed + stopped for
+    # review). Otherwise close it — headless refine/auto runs and failed runs must
+    # not orphan a Chrome that holds the profile lock for the next run.
+    hold_for_human = (not headless) and report["status"] == "ready_for_review"
+    if not hold_for_human:
+        await _safe_kill(browser)
+    report["_held_open"] = hold_for_human
+    return report
 
 
 def derive_status(*, is_done: bool, is_successful: bool, is_validated: bool | None,
@@ -239,7 +259,8 @@ def write_report(report: dict, ticket: dict, guide: Guide, runs_dir: Path) -> Pa
     folio = get_path(ticket, field_map["facturacion_folio"]) or "no-folio"
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     path = runs_dir / f"{stamp}-{report.get('guide_id', 'unknown')}-{folio}.json"
-    report_with_ticket = {**report, "ticket": {
+    public = {k: v for k, v in report.items() if not k.startswith("_")}  # drop internal flags
+    report_with_ticket = {**public, "ticket": {
         "folio": folio,
         "total": get_path(ticket, field_map["total"]),
     }}

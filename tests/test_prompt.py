@@ -78,8 +78,10 @@ def test_write_report_uses_guide_field_map(tmp_path):
 
     amorino = parse_guide(REPO / "guides" / "amorino-gelato.md")
     ticket = {"invoice": {"invoice_number": "369636"}, "summary": {"total": 195.0}}
-    path = write_report({"status": "aborted", "guide_id": "amorino-gelato"}, ticket, amorino, tmp_path)
+    report = {"status": "aborted", "guide_id": "amorino-gelato", "_held_open": False}
+    path = write_report(report, ticket, amorino, tmp_path)
     assert path.name.endswith("-amorino-gelato-369636.json")
+    # internal flags (underscore-prefixed) are stripped from the persisted report
     assert json.loads(path.read_text(encoding="utf-8")) == {
         "status": "aborted",
         "guide_id": "amorino-gelato",
