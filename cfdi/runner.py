@@ -12,6 +12,7 @@ import os
 from datetime import date, datetime
 from pathlib import Path
 
+import httpx
 from browser_use import Agent, Browser, ChatOpenAI
 
 from cfdi.guards import assert_guards, build_tools
@@ -175,3 +176,16 @@ def write_report(report: dict, ticket: dict, guide: Guide, runs_dir: Path) -> Pa
     }}
     path.write_text(json.dumps(report_with_ticket, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def notify_failure(report: dict, url: str) -> bool:
+    """POST a failed run's report to the failure webhook. Never raises —
+    a dead webhook must not turn a reported failure into a crash."""
+    payload = {**report, "occurred_at": datetime.now().isoformat(timespec="seconds")}
+    try:
+        response = httpx.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        return True
+    except Exception as exc:
+        print(f"warning: failure-webhook POST failed: {exc}")
+        return False

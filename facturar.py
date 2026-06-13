@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from cfdi.guides import load_guides
 from cfdi.matcher import extract_signals, match
 from cfdi.preflight import get_path, interpret_purchase_date, preflight
-from cfdi.runner import STATUS_EXIT_CODES, run_agent, write_report
+from cfdi.runner import STATUS_EXIT_CODES, notify_failure, run_agent, write_report
 
 BASE = Path(__file__).parent
 
@@ -80,6 +80,13 @@ def main() -> int:
 
     print(f"\nstatus: {report['status']}")
     print(f"report: {report_path}")
+
+    if report["status"] != "ready_for_review":
+        webhook = os.getenv("INVOICE_FAILURE_WEBHOOK_URL", "").strip()
+        if webhook:
+            persisted = json.loads(report_path.read_text(encoding="utf-8"))
+            if notify_failure({**persisted, "report_file": report_path.name}, webhook):
+                print("failure report POSTed to INVOICE_FAILURE_WEBHOOK_URL")
     if report["status"] == "ready_for_review":
         print("=" * 70)
         print(f"STOPPED BEFORE FINAL SUBMIT — review the open browser window, then")
