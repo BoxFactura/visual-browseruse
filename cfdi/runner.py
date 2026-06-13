@@ -140,8 +140,9 @@ def ground_truth(guide: Guide, auto_submit: bool = False) -> str:
 
 
 def run_agent(guide: Guide, ticket: dict, fiscal: dict, *, headless: bool, model: str,
-              auto_submit: bool = False) -> dict:
-    """Run the browser agent. Returns the report dict (status + payload)."""
+              auto_submit: bool = False, trace=None) -> dict:
+    """Run the browser agent. Returns the report dict (status + payload).
+    trace: optional StepTrace whose callback records each step for refinement."""
     browser = Browser(
         headless=headless,
         keep_alive=True,
@@ -162,6 +163,7 @@ def run_agent(guide: Guide, ticket: dict, fiscal: dict, *, headless: bool, model
         initial_actions=[{"navigate": {"url": guide.portal_url, "new_tab": False}}],
         use_judge=True,
         ground_truth=ground_truth(guide, auto_submit=auto_submit),
+        register_new_step_callback=trace.callback if trace else None,
     )
     assert_guards(tools, auto_submit=auto_submit)
 
