@@ -49,7 +49,7 @@ class Guide:
     path: Path = field(compare=False)
 
 
-def parse_guide(path: Path) -> Guide:
+def parse_guide(path: Path, allow_review_placeholder: bool = False) -> Guide:
     text = path.read_text(encoding="utf-8")
     if not text.startswith("---\n"):
         raise GuideError(f"{path.name}: missing frontmatter opening '---'")
@@ -79,6 +79,11 @@ def parse_guide(path: Path) -> Guide:
     labels = tuple(str(s) for s in stop.get("before_labels", []))
     if not labels:
         raise GuideError(f"{path.name}: stop.before_labels must not be empty")
+    if "REVIEW_REQUIRED" in labels and not allow_review_placeholder:
+        raise GuideError(
+            f"{path.name}: stop.before_labels contains the compiler placeholder "
+            f"REVIEW_REQUIRED — a human must confirm the real final-submit label first"
+        )
 
     window = fm.get("invoicing_window") or {}
     patience = fm["patience"]
