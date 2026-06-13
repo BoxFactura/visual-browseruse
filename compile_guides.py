@@ -99,9 +99,18 @@ RULES
 - Facts known only from tutorial screenshots are hints: write them as
   "expected:" lines. The agent is told the live page wins.
 - Map tutorial vocabulary to canonical placeholders: folio/número de referencia/
-  número de facturación → {{facturacion_folio}}; total/importe → {{total}};
-  RFC/nombre/CP/régimen/uso CFDI/correo → {{rfc}} {{nombre}} {{cp}}
+  número de factura/número de facturación → {{facturacion_folio}}; total/importe
+  → {{total}}; RFC/nombre/CP/régimen/uso CFDI/correo → {{rfc}} {{nombre}} {{cp}}
   {{regimen_fiscal}} {{uso_cfdi}} {{email}}. Use ONLY these placeholders.
+- required_ticket_fields takes dotted TICKET-JSON paths only, from:
+  invoice_data.facturacion_folio, invoice_data.customer_id,
+  invoice_data.transaction_id, purchase.total, purchase.date,
+  store.store_number. Receptor data (RFC, nombre, CP, régimen, uso, email) is
+  NEVER a ticket field — even when the portal asks for it on the first screen,
+  it belongs only in required_fiscal_fields.
+- Error-table actions use ONLY this vocabulary: "abort with status
+  already_invoiced", "abort with status aborted_error_code: <one-line user
+  instruction>", or "one re-verify, then abort". Never invent status names.
 - STRIP marketing, sign-up CTAs, and product-specific instructions (e.g.
   "use your <product> email", "register here") — the agent uses {{email}}.
 - match.domains: the portal's bare eTLD+1 (no scheme, no www, no path).
