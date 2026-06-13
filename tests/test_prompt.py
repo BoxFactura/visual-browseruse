@@ -40,6 +40,26 @@ def test_ground_truth_names_stop_labels():
     )
 
 
+def test_sat_codes_expanded_to_names_in_values():
+    from cfdi.runner import display_value
+
+    assert display_value("regimen_fiscal", "603") == "603 - Personas Morales con Fines no Lucrativos"
+    assert display_value("regimen_fiscal", "612") == "612 - Personas Físicas con Actividades Empresariales y Profesionales"
+    assert display_value("uso_cfdi", "G03") == "G03 - Gastos en general"
+    assert display_value("rfc", "UAP370423PP3") == "UAP370423PP3"
+    assert display_value("regimen_fiscal", "999") == "999"
+
+    fiscal = SAMPLE_FISCAL | {"regimen_fiscal": "603"}
+    prompt = build_task(SAN_PABLO, SAMPLE_TICKET, fiscal, today=date(2026, 6, 12))
+    assert "- {regimen_fiscal} = 603 - Personas Morales con Fines no Lucrativos" in prompt
+    assert "- {uso_cfdi} = G03 - Gastos en general" in prompt
+
+
+def test_policy_explains_dropdown_name_matching():
+    assert "603 - Personas Morales con Fines no Lucrativos" in POLICY
+    assert "dropdowns of full SAT names" in POLICY
+
+
 def test_transposed_ticket_date_is_resolved_in_prompt():
     amorino = parse_guide(REPO / "guides" / "amorino-gelato.md")
     ticket = {

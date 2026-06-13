@@ -61,6 +61,6 @@ button, call ready_for_review with the exact button label and all field values.
 - {rfc} = XAXX010101000
 - {nombre} = Nombre Exacto Como En Constancia
 - {cp} = 01000
-- {regimen_fiscal} = 612
-- {uso_cfdi} = G03
+- {regimen_fiscal} = 612 - Personas Físicas con Actividades Empresariales y Profesionales
+- {uso_cfdi} = G03 - Gastos en general
 - {email} = you@example.com

@@ -17,7 +17,7 @@ from browser_use import Agent, Browser, ChatOpenAI
 
 from cfdi.guards import assert_guards, build_tools
 from cfdi.guides import Guide
-from cfdi.preflight import get_path, interpret_purchase_date
+from cfdi.preflight import REGIMEN_FISCAL, USO_CFDI, get_path, interpret_purchase_date
 
 _POLICY_SUPERVISED_RULE = """\
 - NEVER click a final submit button (labels like Emitir/Generar y Enviar/Timbrar/
@@ -35,6 +35,12 @@ You operate Mexican CFDI self-invoicing portals following a per-merchant guide.
 Global rules, in priority order:
 {mode_rule}
 - Work in Spanish; portals are in Spanish.
+- Régimen fiscal and uso de CFDI are dropdowns of full SAT names, not codes.
+  Select the option whose text matches the name given after the code in VALUES
+  (e.g. "603 - Personas Morales con Fines no Lucrativos" → pick exactly that
+  option). After selecting, VERIFY the dropdown shows that name; if the only
+  available options don't include it, stop and report — do not accept a
+  different régimen.
 - For currency- or number-masked fields, use the set_masked_input action with
   digits only. Never type amounts with decimal points.
 - Lines starting with "expected:" in the guide describe what the tutorial
@@ -74,6 +80,17 @@ STATUS_EXIT_CODES = {
 }
 
 
+def display_value(key: str, value) -> str:
+    """Expand SAT codes to 'code - official name' so the agent can match the
+    portal's dropdowns (which list names, not codes) and verify its selection."""
+    code = str(value)
+    if key == "regimen_fiscal" and code in REGIMEN_FISCAL:
+        return f"{code} - {REGIMEN_FISCAL[code]}"
+    if key == "uso_cfdi" and code in USO_CFDI:
+        return f"{code} - {USO_CFDI[code][0]}"
+    return str(value)
+
+
 def build_task(guide: Guide, ticket: dict, fiscal: dict, today: date,
                auto_submit: bool = False) -> str:
     placeholders = {
@@ -86,7 +103,10 @@ def build_task(guide: Guide, ticket: dict, fiscal: dict, today: date,
         if parsed:
             placeholders["purchase_date"] = parsed.isoformat()
     override = f"{AUTO_SUBMIT_OVERRIDE}\n\n" if auto_submit else ""
-    values = "\n".join(f"- {{{k}}} = {v}" for k, v in placeholders.items() if v is not None)
+    values = "\n".join(
+        f"- {{{k}}} = {display_value(k, v)}"
+        for k, v in placeholders.items() if v is not None
+    )
     return (
         f"Generate — but do NOT submit — a CFDI invoice. {guide.description}\n\n"
         f"# MERCHANT GUIDE ({guide.id}, verified {guide.last_verified})\n"
