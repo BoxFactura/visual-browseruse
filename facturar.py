@@ -36,7 +36,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ticket", type=Path, help="ticket JSON file")
     parser.add_argument("--fiscal", type=Path, default=BASE / "fiscal.json")
-    parser.add_argument("--guide", help="force a guide id, skipping matching")
+    guide_sel = parser.add_mutually_exclusive_group()
+    guide_sel.add_argument("--guide", help="force a guide id, skipping matching")
+    guide_sel.add_argument("--no-guide", action="store_true",
+                           help="ignore any matching guide; run adaptive generic mode "
+                                "(supervised only) — useful to test adaptation or when a "
+                                "guide is stale")
     parser.add_argument("--headless", action="store_true",
                         help="run headless (default: visible, also via HEADLESS env)")
     parser.add_argument("--auto-submit", action="store_true",
@@ -50,7 +55,17 @@ def main() -> int:
     ticket = json.loads(args.ticket.read_text(encoding="utf-8"))
     fiscal = json.loads(args.fiscal.read_text(encoding="utf-8"))
 
-    if args.guide:
+    if args.no_guide:
+        try:
+            guide = generic_guide(ticket)
+        except GuideError as exc:
+            print(f"cannot run: {exc}")
+            return STATUS_EXIT_CODES["no_match"]
+        print(f"ignoring any matching guide (--no-guide) — ADAPTIVE generic mode "
+              f"(supervised only), starting at {guide.portal_url}")
+        print("  the final-submit gate is best-effort here; a human verifies, and a "
+              "hint draft is written on success.")
+    elif args.guide:
         by_id = {g.id: g for g in guides}
         if args.guide not in by_id:
             print(f"unknown guide {args.guide!r}; available: {', '.join(sorted(by_id))}")
