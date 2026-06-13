@@ -56,14 +56,27 @@ Global rules, in priority order:
 POLICY = POLICY_TEMPLATE.format(mode_rule=_POLICY_SUPERVISED_RULE)
 POLICY_AUTO = POLICY_TEMPLATE.format(mode_rule=_POLICY_AUTO_RULE)
 
-AUTO_SUBMIT_OVERRIDE = """
-# MODE OVERRIDE — AUTO-SUBMIT
-The guide's stop rules ("NEVER click", ready_for_review) are suspended for this
-run. After the last verification passes: click the final button named in the
-guide's Stop section, complete any confirmation dialog, wait for the portal's
-confirmation, then call confirm_emission. Abort rather than submit if any value
-on screen differs from the provided values.
-""".strip()
+def auto_submit_override(stop_labels: tuple[str, ...]) -> str:
+    labels = " / ".join(f'"{s}"' for s in stop_labels) or "the final submit button"
+    return (
+        "# MODE OVERRIDE — AUTO-SUBMIT (this run ISSUES the invoice)\n"
+        "Any \"NEVER click\" or \"call ready_for_review\" wording is for supervised runs "
+        "and is SUSPENDED here. In THIS run, once every field is filled and verified "
+        "against the values:\n"
+        f"1. Click the final submit button ({labels}).\n"
+        "2. Complete any confirmation dialog (e.g. Aceptar / Confirmar).\n"
+        "3. Wait for the portal's emission confirmation (folio fiscal / UUID, download "
+        "links, or a success message).\n"
+        "4. Call confirm_emission with that verbatim confirmation. Do NOT call done or "
+        "ready_for_review.\n"
+        "Abort (do not submit) only if an on-screen value differs from the values provided."
+    )
+
+
+def _strip_supervised_stop(body: str) -> str:
+    """Drop the guide's supervised '## Stop & completion' prose for auto-submit runs,
+    so its 'NEVER click' instruction can't contradict the submit override."""
+    return body.split("\n## Stop & completion")[0].rstrip()
 
 PROFILES_DIR = "~/.config/browseruse/profiles"
 
@@ -102,7 +115,8 @@ def build_task(guide: Guide, ticket: dict, fiscal: dict, today: date,
         parsed, _ = interpret_purchase_date(str(raw_date), today)
         if parsed:
             placeholders["purchase_date"] = parsed.isoformat()
-    override = f"{AUTO_SUBMIT_OVERRIDE}\n\n" if auto_submit else ""
+    body = _strip_supervised_stop(guide.body) if auto_submit else guide.body
+    override = f"{auto_submit_override(guide.stop_before_labels)}\n\n" if auto_submit else ""
     values = "\n".join(
         f"- {{{k}}} = {display_value(k, v)}"
         for k, v in placeholders.items() if v is not None
@@ -119,7 +133,7 @@ def build_task(guide: Guide, ticket: dict, fiscal: dict, today: date,
     return (
         f"Generate — but do NOT submit — a CFDI invoice. {guide.description}\n\n"
         f"# {label} ({guide.id}, verified {guide.last_verified})\n"
-        f"{guide.body}\n\n"
+        f"{body}\n\n"
         f"# PATIENCE LIMITS\n"
         f"- wait_seconds: {guide.patience_wait_seconds}\n"
         f"- max_reload_cycles: {guide.patience_max_reload_cycles}\n\n"

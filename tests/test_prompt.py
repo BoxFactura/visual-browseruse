@@ -102,12 +102,28 @@ def test_auto_submit_task_and_policy():
                         auto_submit=True)
     assert "# MODE OVERRIDE — AUTO-SUBMIT" in prompt
     assert prompt.index("# MODE OVERRIDE — AUTO-SUBMIT") < prompt.index("# VALUES")
+    # the override names the actual stop label so the agent knows what to click
+    assert '"Emitir Factura"' in prompt
+    # the guide body's supervised stop prose is stripped in auto mode (no contradiction);
+    # the only remaining "NEVER click" is the override quoting it to suspend it
+    assert "## Stop & completion" not in prompt
+    assert "NEVER click it" not in prompt
+
     supervised = build_task(SAN_PABLO, SAMPLE_TICKET, SAMPLE_FISCAL, today=date(2026, 6, 12))
     assert "AUTO-SUBMIT" not in supervised
+    assert "NEVER click it" in supervised  # supervised run keeps the guide's stop prose
+    assert "## Stop & completion" in supervised
 
     assert "confirm_emission" in POLICY_AUTO
     assert "NEVER click a final submit button" not in POLICY_AUTO
     assert "set_masked_input" in POLICY_AUTO
+
+
+def test_auto_submit_strips_only_the_stop_section():
+    from cfdi.runner import _strip_supervised_stop
+
+    body = "## Steps\n1. do a thing\n\n## Error codes\n| x | y | z |\n\n## Stop & completion\nNEVER click it."
+    assert _strip_supervised_stop(body) == "## Steps\n1. do a thing\n\n## Error codes\n| x | y | z |"
 
 
 def test_ground_truth_auto_submit():
