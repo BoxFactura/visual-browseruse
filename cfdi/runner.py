@@ -130,8 +130,13 @@ def build_task(guide: Guide, ticket: dict, fiscal: dict, today: date,
             "as the portal asks)\n" + json.dumps(ticket, ensure_ascii=False)
         )
     label = "MERCHANT GUIDE" if not guide.is_generic else "HINTS (no specific guide — adapt)"
+    opening = (
+        f"Generate AND SUBMIT (issue) a CFDI invoice — this run issues it. {guide.description}"
+        if auto_submit else
+        f"Generate — but do NOT submit — a CFDI invoice. {guide.description}"
+    )
     return (
-        f"Generate — but do NOT submit — a CFDI invoice. {guide.description}\n\n"
+        f"{opening}\n\n"
         f"# {label} ({guide.id}, verified {guide.last_verified})\n"
         f"{body}\n\n"
         f"# PATIENCE LIMITS\n"

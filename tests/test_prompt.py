@@ -102,6 +102,9 @@ def test_auto_submit_task_and_policy():
                         auto_submit=True)
     assert "# MODE OVERRIDE — AUTO-SUBMIT" in prompt
     assert prompt.index("# MODE OVERRIDE — AUTO-SUBMIT") < prompt.index("# VALUES")
+    # the opening line must NOT tell the agent not to submit (the bug that made it stop)
+    assert prompt.splitlines()[0].startswith("Generate AND SUBMIT")
+    assert "but do NOT submit" not in prompt
     # the override names the actual stop label so the agent knows what to click
     assert '"Emitir Factura"' in prompt
     # the guide body's supervised stop prose is stripped in auto mode (no contradiction);
