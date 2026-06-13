@@ -9,14 +9,14 @@ the per-run values LAST.
 import asyncio
 import json
 import os
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from browser_use import Agent, Browser, ChatOpenAI
 
 from cfdi.guards import assert_guards, build_tools
 from cfdi.guides import Guide
-from cfdi.preflight import get_path
+from cfdi.preflight import get_path, interpret_purchase_date
 
 POLICY = """
 You operate Mexican CFDI self-invoicing portals following a per-merchant guide.
@@ -51,13 +51,16 @@ STATUS_EXIT_CODES = {
 }
 
 
-def build_task(guide: Guide, ticket: dict, fiscal: dict) -> str:
+def build_task(guide: Guide, ticket: dict, fiscal: dict, today: date) -> str:
     placeholders = {
-        "facturacion_folio": get_path(ticket, "invoice_data.facturacion_folio"),
-        "total": get_path(ticket, "purchase.total"),
-        "purchase_date": get_path(ticket, "purchase.date"),
-        **fiscal,
-    }
+        name: get_path(ticket, path) for name, path in guide.ticket_field_map
+    } | fiscal
+    # The agent must see the resolved purchase date, never a transposed raw one.
+    raw_date = placeholders.get("purchase_date")
+    if raw_date is not None:
+        parsed, _ = interpret_purchase_date(str(raw_date), today)
+        if parsed:
+            placeholders["purchase_date"] = parsed.isoformat()
     values = "\n".join(f"- {{{k}}} = {v}" for k, v in placeholders.items() if v is not None)
     return (
         f"Generate — but do NOT submit — a CFDI invoice. {guide.description}\n\n"
@@ -94,7 +97,7 @@ def run_agent(guide: Guide, ticket: dict, fiscal: dict, *, headless: bool, model
     tools = build_tools(guide.stop_before_labels)
     fallback = os.getenv("INVOICE_FALLBACK_MODEL", "gpt-5.4-mini")
     agent = Agent(
-        task=build_task(guide, ticket, fiscal),
+        task=build_task(guide, ticket, fiscal, today=date.today()),
         browser=browser,
         tools=tools,
         llm=ChatOpenAI(model=model),

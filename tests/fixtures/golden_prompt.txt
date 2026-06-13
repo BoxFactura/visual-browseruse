@@ -56,8 +56,8 @@ button, call ready_for_review with the exact button label and all field values.
 
 # VALUES (substitute into the guide's {placeholders}; use verbatim)
 - {facturacion_folio} = 099000000000000000000
-- {total} = 100.0
 - {purchase_date} = 2026-06-01
+- {total} = 100.0
 - {rfc} = XAXX010101000
 - {nombre} = Nombre Exacto Como En Constancia
 - {cp} = 01000

@@ -37,6 +37,19 @@ def test_registry_safety_surface():
     assert_guards(tools)
 
 
+def test_custom_action_params_are_strict_schema_compatible():
+    """OpenAI strict structured output 400s on dict-typed (arbitrary-key map)
+    action params — every property must be an enumerated type. Regression test
+    for the run that failed 6/6 steps with 'Invalid schema for response_format'."""
+    tools = build_tools(STOP)
+    actions = tools.registry.registry.actions
+    for name in ("ready_for_review", "set_masked_input"):
+        schema = actions[name].param_model.model_json_schema()
+        for prop_name, prop in schema.get("properties", {}).items():
+            is_map = prop.get("type") == "object" and "additionalProperties" in prop
+            assert not is_map, f"{name}.{prop_name} is a dict-typed param (breaks strict mode)"
+
+
 def test_assert_guards_catches_unguarded_tools():
     from browser_use import Tools
 

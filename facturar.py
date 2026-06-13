@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 
 from cfdi.guides import load_guides
 from cfdi.matcher import extract_signals, match
-from cfdi.preflight import preflight
+from cfdi.preflight import get_path, interpret_purchase_date, preflight
 from cfdi.runner import STATUS_EXIT_CODES, run_agent, write_report
 
 BASE = Path(__file__).parent
@@ -67,6 +67,12 @@ def main() -> int:
         for p in problems:
             print(f"  - {p}")
         return STATUS_EXIT_CODES["preflight_failed"]
+
+    raw_date = get_path(ticket, dict(guide.ticket_field_map)["purchase_date"])
+    if raw_date is not None:
+        _, note = interpret_purchase_date(str(raw_date), date.today())
+        if note:
+            print(f"note: {note}")
 
     headless = args.headless or bool(os.getenv("HEADLESS", "").strip())
     report = run_agent(guide, ticket, fiscal, headless=headless, model=args.model)

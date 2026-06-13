@@ -89,6 +89,36 @@ def test_ticket_outside_invoicing_window():
     ]
 
 
+def test_interpret_purchase_date_table():
+    from cfdi.preflight import interpret_purchase_date
+
+    assert interpret_purchase_date("2026-11-06", date(2026, 6, 12)) == (
+        date(2026, 6, 11),
+        "date '2026-11-06' read as 2026-06-11 (the literal reading is in the future; "
+        "day/month order corrected)",
+    )
+    assert interpret_purchase_date("2026-04-05", date(2026, 6, 12)) == (date(2026, 4, 5), None)
+    assert interpret_purchase_date("2026-13-01", date(2026, 6, 12)) == (
+        date(2026, 1, 13),
+        "date '2026-13-01' read as 2026-01-13 (the literal reading is invalid; "
+        "day/month order corrected)",
+    )
+    assert interpret_purchase_date("2026-12-25", date(2026, 6, 12)) == (date(2026, 12, 25), None)
+    assert interpret_purchase_date("garbage", date(2026, 6, 12)) == (None, None)
+
+
+def test_amorino_shaped_ticket_passes_with_field_map():
+    from cfdi.guides import parse_guide
+
+    amorino = parse_guide(Path(__file__).parent.parent / "guides" / "amorino-gelato.md")
+    ticket = {
+        "invoice": {"invoice_number": "369636", "date": "2026-11-06"},
+        "summary": {"total": 195.0},
+        "additional_info": {"invoice_url": "https://facturacion.amorinogelato.com"},
+    }
+    assert validate_ticket(ticket, amorino, today=date(2026, 6, 12)) == []
+
+
 def test_ticket_future_date_and_zero_total():
     ticket = pollos_ticket()
     ticket["purchase"]["date"] = "2027-01-01"

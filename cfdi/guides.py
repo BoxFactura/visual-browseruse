@@ -26,6 +26,14 @@ REQUIRED_KEYS = [
 # chars/4 ≈ tokens; real tokenizer arrives with the phase-2 compiler
 BODY_BUDGET_CHARS = 20_000
 
+# Canonical placeholder → default ticket-JSON path. A guide overrides entries via
+# frontmatter `ticket_field_map` when its merchant's extractor emits another shape.
+DEFAULT_TICKET_FIELD_MAP = {
+    "facturacion_folio": "invoice_data.facturacion_folio",
+    "total": "purchase.total",
+    "purchase_date": "purchase.date",
+}
+
 
 class GuideError(ValueError):
     pass
@@ -41,6 +49,7 @@ class Guide:
     required_ticket_fields: tuple[str, ...]
     required_fiscal_fields: tuple[str, ...]
     invoicing_window_days: int | None
+    ticket_field_map: tuple[tuple[str, str], ...]
     stop_before_labels: tuple[str, ...]
     patience_max_reload_cycles: int
     patience_wait_seconds: int
@@ -88,6 +97,16 @@ def parse_guide(path: Path, allow_review_placeholder: bool = False) -> Guide:
     window = fm.get("invoicing_window") or {}
     patience = fm["patience"]
 
+    field_map = dict(DEFAULT_TICKET_FIELD_MAP)
+    overrides = fm.get("ticket_field_map") or {}
+    unknown = sorted(set(overrides) - set(DEFAULT_TICKET_FIELD_MAP))
+    if unknown:
+        raise GuideError(
+            f"{path.name}: ticket_field_map has unknown placeholders: {', '.join(unknown)} "
+            f"(known: {', '.join(sorted(DEFAULT_TICKET_FIELD_MAP))})"
+        )
+    field_map.update({k: str(v) for k, v in overrides.items()})
+
     return Guide(
         id=str(fm["id"]),
         description=str(fm["description"]),
@@ -97,6 +116,7 @@ def parse_guide(path: Path, allow_review_placeholder: bool = False) -> Guide:
         required_ticket_fields=tuple(fm["required_ticket_fields"]),
         required_fiscal_fields=tuple(fm["required_fiscal_fields"]),
         invoicing_window_days=window.get("max_days_after_purchase"),
+        ticket_field_map=tuple(sorted(field_map.items())),
         stop_before_labels=labels,
         patience_max_reload_cycles=int(patience["max_reload_cycles"]),
         patience_wait_seconds=int(patience["wait_seconds"]),

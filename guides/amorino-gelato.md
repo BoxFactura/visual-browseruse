@@ -5,8 +5,12 @@ match:
   domains: [amorinogelato.com]
   rfcs: []
 portal_url: https://facturacion.amorinogelato.com/
-required_ticket_fields: [invoice_data.facturacion_folio]
+required_ticket_fields: [invoice.invoice_number, summary.total]
 required_fiscal_fields: [rfc, nombre, cp, regimen_fiscal, uso_cfdi, email]
+ticket_field_map:
+  facturacion_folio: invoice.invoice_number
+  total: summary.total
+  purchase_date: invoice.date
 stop:
   before_labels: ["GENERAR FACTURA"]
 patience: { max_reload_cycles: 3, wait_seconds: 10 }

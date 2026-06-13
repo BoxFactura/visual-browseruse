@@ -124,16 +124,20 @@ def build_tools(stop_labels: tuple[str, ...]) -> Tools:
         memory = f"set_masked_input({digits!r}) on element {index}; field now reads {value!r}"
         return ActionResult(extracted_content=memory, long_term_memory=memory)
 
+    # NOTE: params must be strict-JSON-schema friendly — OpenAI's structured
+    # output rejects dict[...] (arbitrary-key map) parameters with a 400 on
+    # every step. Strings and typed lists only.
     @tools.action(
         "Call this ONLY when every form field is filled and verified and the single "
         "remaining action is the final submit button (which a human will click). "
+        "fields_filled/fields_empty take one 'label = value' per line ('none' if empty). "
         "This ends the run successfully."
     )
     async def ready_for_review(
         final_url: str,
         human_next_button: str,
-        fields_filled: dict[str, str],
-        fields_empty: dict[str, str],
+        fields_filled: str,
+        fields_empty: str,
         portal_errors_verbatim: list[str],
     ):
         payload = {

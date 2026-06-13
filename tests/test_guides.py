@@ -19,6 +19,11 @@ def test_parse_fixture_guide_full_object():
         required_ticket_fields=("invoice_data.facturacion_folio", "purchase.total"),
         required_fiscal_fields=("rfc", "nombre", "cp", "regimen_fiscal", "uso_cfdi", "email"),
         invoicing_window_days=30,
+        ticket_field_map=(
+            ("facturacion_folio", "invoice_data.facturacion_folio"),
+            ("purchase_date", "purchase.date"),
+            ("total", "purchase.total"),
+        ),
         stop_before_labels=("Facturar",),
         patience_max_reload_cycles=2,
         patience_wait_seconds=5,
@@ -45,6 +50,34 @@ def test_parse_real_san_pablo_guide():
 def test_load_guides_returns_both_fixtures():
     guides = load_guides(FIXTURES / "guides")
     assert [g.id for g in guides] == ["los-pollos-hermanos", "madrigal-electromotive"]
+
+
+def test_real_amorino_guide_ticket_field_map():
+    guide = parse_guide(REPO / "guides" / "amorino-gelato.md")
+    assert guide.ticket_field_map == (
+        ("facturacion_folio", "invoice.invoice_number"),
+        ("purchase_date", "invoice.date"),
+        ("total", "summary.total"),
+    )
+    assert guide.required_ticket_fields == ("invoice.invoice_number", "summary.total")
+    assert guide.stop_before_labels == ("GENERAR FACTURA",)
+
+
+def test_unknown_ticket_field_map_placeholder_rejected(tmp_path):
+    text = (FIXTURES / "guides" / "los-pollos-hermanos.md").read_text(encoding="utf-8")
+    (tmp_path / "weird.md").write_text(
+        text.replace(
+            "patience: { max_reload_cycles: 2, wait_seconds: 5 }",
+            "patience: { max_reload_cycles: 2, wait_seconds: 5 }\nticket_field_map: { folio: a.b }",
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(GuideError) as exc:
+        parse_guide(tmp_path / "weird.md")
+    assert str(exc.value) == (
+        "weird.md: ticket_field_map has unknown placeholders: folio "
+        "(known: facturacion_folio, purchase_date, total)"
+    )
 
 
 def test_duplicate_match_claims_rejected():

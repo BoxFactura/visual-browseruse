@@ -5,7 +5,7 @@ below — they change rarely; the phase-2 compiler PR owns keeping them current.
 """
 
 import re
-from datetime import date, datetime
+from datetime import date
 
 from cfdi.guides import Guide
 
@@ -46,6 +46,35 @@ USO_CFDI = {
 RFC_RE = re.compile(r"^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$")
 CP_RE = re.compile(r"^\d{5}$")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def interpret_purchase_date(raw: str, today: date) -> tuple[date | None, str | None]:
+    """Resolve a ticket date, tolerating extractor day/month transposition.
+
+    A receipt describes a past purchase, so a future literal reading is
+    impossible. If YYYY-MM-DD parses to a future date (or doesn't parse) and
+    the day/month-swapped reading is a valid past date, the swap is the only
+    consistent interpretation. Returns (date, note) — note explains a swap;
+    (None, None) means unparseable either way.
+    """
+    def parse(year: str, month: str, day: str) -> date | None:
+        try:
+            return date(int(year), int(month), int(day))
+        except ValueError:
+            return None
+
+    parts = str(raw).split("-")
+    if len(parts) != 3:
+        return None, None
+    literal = parse(parts[0], parts[1], parts[2])
+    swapped = parse(parts[0], parts[2], parts[1])
+
+    if literal and literal <= today:
+        return literal, None
+    if swapped and swapped <= today:
+        why = "the literal reading is in the future" if literal else "the literal reading is invalid"
+        return swapped, f"date {raw!r} read as {swapped.isoformat()} ({why}; day/month order corrected)"
+    return (literal, None) if literal else (None, None)
 
 
 def get_path(data: dict, dotted: str):
@@ -96,30 +125,31 @@ def validate_fiscal(fiscal: dict, required_fields: tuple[str, ...]) -> list[str]
 
 def validate_ticket(ticket: dict, guide: Guide, today: date) -> list[str]:
     errors = []
+    field_map = dict(guide.ticket_field_map)
     for dotted in guide.required_ticket_fields:
         if get_path(ticket, dotted) is None:
             errors.append(f"ticket: missing required field '{dotted}' (required by guide {guide.id})")
 
-    total = get_path(ticket, "purchase.total")
+    total_path = field_map["total"]
+    total = get_path(ticket, total_path)
     if total is not None and not (isinstance(total, (int, float)) and total > 0):
-        errors.append(f"ticket: purchase.total must be a positive number, got {total!r}")
+        errors.append(f"ticket: {total_path} must be a positive number, got {total!r}")
 
-    raw_date = get_path(ticket, "purchase.date")
+    date_path = field_map["purchase_date"]
+    raw_date = get_path(ticket, date_path)
     if raw_date is not None:
-        try:
-            purchased = datetime.strptime(str(raw_date), "%Y-%m-%d").date()
-        except ValueError:
-            errors.append(f"ticket: purchase.date {raw_date!r} is not a YYYY-MM-DD date")
-        else:
-            if purchased > today:
-                errors.append(f"ticket: purchase.date {purchased.isoformat()} is in the future")
-            elif guide.invoicing_window_days is not None:
-                age = (today - purchased).days
-                if age > guide.invoicing_window_days:
-                    errors.append(
-                        f"ticket: purchase is {age} days old; guide {guide.id} allows invoicing "
-                        f"within {guide.invoicing_window_days} days"
-                    )
+        purchased, _ = interpret_purchase_date(str(raw_date), today)
+        if purchased is None:
+            errors.append(f"ticket: {date_path} {raw_date!r} is not a YYYY-MM-DD date")
+        elif purchased > today:
+            errors.append(f"ticket: {date_path} {purchased.isoformat()} is in the future")
+        elif guide.invoicing_window_days is not None:
+            age = (today - purchased).days
+            if age > guide.invoicing_window_days:
+                errors.append(
+                    f"ticket: purchase is {age} days old; guide {guide.id} allows invoicing "
+                    f"within {guide.invoicing_window_days} days"
+                )
     return errors
 
 
