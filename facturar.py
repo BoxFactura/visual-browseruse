@@ -61,10 +61,9 @@ def main() -> int:
         except GuideError as exc:
             print(f"cannot run: {exc}")
             return STATUS_EXIT_CODES["no_match"]
-        print(f"ignoring any matching guide (--no-guide) — ADAPTIVE generic mode "
-              f"(supervised only), starting at {guide.portal_url}")
-        print("  the final-submit gate is best-effort here; a human verifies, and a "
-              "hint draft is written on success.")
+        print(f"ignoring any matching guide (--no-guide) — ADAPTIVE generic mode, "
+              f"starting at {guide.portal_url}")
+        print("  best-effort final-submit gate; a hint draft is written on success.")
     elif args.guide:
         by_id = {g.id: g for g in guides}
         if args.guide not in by_id:
@@ -84,10 +83,9 @@ def main() -> int:
             except GuideError as exc:
                 print(f"cannot run: {exc}")
                 return STATUS_EXIT_CODES["no_match"]
-            print(f"no guide for this portal — ADAPTIVE generic mode (supervised only), "
-                  f"starting at {guide.portal_url}")
-            print("  the final-submit gate is best-effort here; a human verifies, and a "
-                  "hint draft is written on success.")
+            print(f"no guide for this portal — ADAPTIVE generic mode, starting at "
+                  f"{guide.portal_url}")
+            print("  best-effort final-submit gate; a hint draft is written on success.")
         else:
             guide = next(g for g in guides if g.id == result.guide_id)
             print(f"matched guide: {guide.id} (tier: {result.tier})")
@@ -108,16 +106,18 @@ def main() -> int:
     headless = args.headless or bool(os.getenv("HEADLESS", "").strip())
     auto_submit = args.auto_submit
     if auto_submit and guide.is_generic:
-        print("note: --auto-submit ignored on an unknown portal — supervised first encounter.")
-        auto_submit = False
-    if auto_submit:
+        print("⚠️  AUTO-SUBMIT on an UNKNOWN portal (no guide): the agent identifies and")
+        print("    clicks the submit button itself — no precise stop label — then must")
+        print("    capture the portal's confirmation (judge-checked). Riskiest mode;")
+        print("    pre-flight validated your data. Proceeding as requested.")
+    elif auto_submit:
         print("AUTO-SUBMIT mode: the agent will emit the invoice itself.")
     report = run_agent(guide, ticket, fiscal, headless=headless, model=args.model,
                        auto_submit=auto_submit)
     report_path = write_report(report, ticket, guide, BASE / "runs")
 
     # Self-authoring: a successful first encounter teaches the portal's real flow.
-    if guide.is_generic and report["status"] == "ready_for_review":
+    if guide.is_generic and report["status"] in ("ready_for_review", "submitted"):
         draft = write_hint_draft(guide, ticket, report, BASE / "guides" / "_drafts")
         print(f"self-authored hint draft: {draft}")
         print("  review it (esp. stop.before_labels) and move into guides/ to make this "

@@ -57,13 +57,13 @@ POLICY = POLICY_TEMPLATE.format(mode_rule=_POLICY_SUPERVISED_RULE)
 POLICY_AUTO = POLICY_TEMPLATE.format(mode_rule=_POLICY_AUTO_RULE)
 
 def auto_submit_override(stop_labels: tuple[str, ...]) -> str:
-    labels = " / ".join(f'"{s}"' for s in stop_labels) or "the final submit button"
+    labels = " / ".join(f'"{s}"' for s in stop_labels) or "Generar / Emitir / Facturar / Timbrar"
     return (
         "# MODE OVERRIDE — AUTO-SUBMIT (this run ISSUES the invoice)\n"
         "Any \"NEVER click\" or \"call ready_for_review\" wording is for supervised runs "
         "and is SUSPENDED here. In THIS run, once every field is filled and verified "
         "against the values:\n"
-        f"1. Click the final submit button ({labels}).\n"
+        f"1. Identify and click the button that ISSUES the invoice (likely labeled {labels}).\n"
         "2. Complete any confirmation dialog (e.g. Aceptar / Confirmar).\n"
         "3. Wait for the portal's emission confirmation (folio fiscal / UUID, download "
         "links, or a success message).\n"
