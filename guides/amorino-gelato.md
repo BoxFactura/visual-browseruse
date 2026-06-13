@@ -14,27 +14,38 @@ ticket_field_map:
 stop:
   before_labels: ["GENERAR FACTURA"]
 patience: { max_reload_cycles: 3, wait_seconds: 10 }
-last_verified: 1970-01-01
+last_verified: 2026-06-12
 ---
 ## Preconditions
 - Ticket: número de factura.
 - Fiscal: RFC, nombre, CP, régimen fiscal, uso CFDI, email.
 
 ## Steps
-1. You start on the billing page (navigation is pre-done). If it looks blank, apply the patience policy.
-   verify: a "NÚMERO DE FACTURA" input is visible.
-2. Fill "NÚMERO DE FACTURA" with {facturacion_folio} and "RFC" with {rfc}.
-   expected: step 1 shows only those two fields before continuing.
-   verify: both fields show the exact values.
-3. Click "SIGUIENTE PASO".
-   verify: the fiscal-data form appears.
-4. Fill RFC {rfc}, nombre {nombre}, CP {cp}, régimen {regimen_fiscal}, uso {uso_cfdi}, email {email}.
-   expected: the name field may be labeled "NOMBRE O RAZÓN SOCIAL".
-   verify: every field shows the exact values provided.
+1. You start on the billing page (navigation is pre-done). Screen 1 has only two
+   inputs: "NÚMERO DE FACTURA" and "RFC". Fill them with {facturacion_folio} and
+   {rfc}, then click "SIGUIENTE PASO" in the same step.
+   verify: both fields held the exact values and the URL advances to
+   .../invoice/fiscal-data.
+2. The fiscal-data form is a slow SPA — it renders a moment after the URL change;
+   if its inputs aren't interactive yet, wait briefly (do NOT re-probe the DOM
+   repeatedly). The form has these fields — fill in one step:
+   - "Nombre o Razón Social" → {nombre}
+   - email / "Correo" → {email}
+   - "Código Postal" → {cp}
+   - RFC carries over from screen 1 — verify it reads {rfc}; do NOT re-type it.
+   - "Uso del CFDI" usually pre-defaults to {uso_cfdi} — verify it; change only if different.
+   - "Régimen Fiscal" is a click-to-open dropdown (a button labeled "Seleccionar
+     régimen fiscal" / a listbox, NOT a native <select>): click it to open.
+   verify: nombre, email, CP are exact and the régimen dropdown is open.
+3. From the open régimen list, click the option whose text exactly matches the
+   name in {regimen_fiscal}.
+   verify: the régimen field now shows that exact name (not a different régimen).
 
 ## Quirks
 | symptom | workaround |
 |---|---|
+| fiscal form inputs not interactive right after "Siguiente paso" | wait briefly for the SPA; don't loop find_elements |
+| Régimen fiscal won't take a typed value | it's a click-to-open listbox: click "Seleccionar régimen fiscal", then click the option by name |
 | page blank for >10s | patience policy: wait, reload, max cycles per policy |
 | tutorial says to use a Box Factura email | ignore product-specific guidance and use {email} |
 
