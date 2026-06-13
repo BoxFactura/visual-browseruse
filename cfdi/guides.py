@@ -56,6 +56,102 @@ class Guide:
     last_verified: str
     body: str
     path: Path = field(compare=False)
+    is_generic: bool = field(default=False, compare=False)  # synthesized for an unknown portal
+
+
+# Portable hints that apply to ~any Mexican CFDI portal — the distilled
+# cross-portal knowledge an unknown-portal run starts from (no per-site steps).
+GENERIC_HINTS_BODY = """\
+## Unknown portal — adapt to the live page
+There is no portal-specific guide yet. These are general hints, not a script:
+read the screen and adapt.
+
+## Approach
+1. You start at the ticket's invoicing URL. If it is a marketing homepage, find the
+   "Facturación" / "Factura" / "Facturar" entry and open it. A blank page is usually a
+   slow SPA — wait and reload (see patience limits) before concluding it is down.
+2. Forms are usually 1-3 steps: ticket lookup (número/folio; sometimes total and date),
+   then receptor fiscal data, then an emit button. Fill only the fields THIS portal shows
+   from the data below — portals ask for a SUBSET. Never invent a value you were not given.
+3. Bad-design flow is common: you often must fill a field and THEN click a button
+   (Buscar / Siguiente / Continuar) to advance or to enable later fields. After filling,
+   look for and click that advance button.
+4. Régimen fiscal and Uso de CFDI are dropdowns — sometimes native <select>, sometimes
+   custom click-to-open lists. Select the option whose TEXT matches the name after the
+   code in the data, then verify it shows that name.
+5. Some fields carry over between steps (often RFC) — verify, do not re-type.
+
+## Quirks
+| symptom | workaround |
+|---|---|
+| typed value doubles or won't stick (React/Vue input) | set the value once via the native setter + input/change events; don't retype char-by-char |
+| amount field is currency-masked ("$474.00" mangled) | type digits only |
+| custom dropdown won't accept a typed value | click it to open, then click the option by its visible name |
+| page blank after navigation | slow SPA: wait, reload, up to the patience limit; never declare it down first |
+
+## Error codes
+| portal message contains | meaning | action |
+|---|---|---|
+| ya facturado / previamente facturado | this ticket already has an invoice | abort with status already_invoiced |
+| CFDI40147 / domicilio fiscal / no coincide con el SAT | receptor RFC/name/CP/régimen ≠ SAT registry | abort aborted_error_code: tell the user to match their Constancia de Situación Fiscal |
+| problema técnico / intente más tarde / error al generar | portal-side failure | abort aborted_error_code |
+
+## Stop & completion
+First encounter with this portal — a human verifies. NEVER click a final emit button
+(labels containing Emitir / Generar / Timbrar / Facturar / Enviar at the last step).
+When the form is filled and only that button remains, call ready_for_review with the
+EXACT label of that button — that is what teaches the portal's real stop label."""
+
+# High-confidence final-emit verbs to block mechanically on an unknown portal.
+# Bare "Generar Factura" is deliberately excluded — it is the ENTRY button on some
+# portals (San Pablo) and the FINAL button on others (Amorino); the exact label is
+# portal-specific, which is precisely why a per-portal hint is required. Generic runs
+# cover the gap by being supervised-only + the strong prompt rule above.
+GENERIC_STOP_LABELS = (
+    "Timbrar", "Emitir Factura", "Emitir CFDI", "Generar CFDI",
+    "Generar Factura y Enviar", "Generar y Enviar", "Enviar Factura", "Facturar y Enviar",
+)
+
+
+def _host_slug(url: str) -> str:
+    from urllib.parse import urlparse
+    host = (urlparse(url).hostname or "").removeprefix("www.")
+    return host.replace(".", "-") or "unknown-portal"
+
+
+def generic_guide(ticket: dict) -> Guide:
+    """Synthesize an adaptive hint-guide for a portal we have no guide for.
+
+    Raises GuideError if the ticket carries no invoicing URL to start from.
+    """
+    invoice_url = (ticket.get("additional_info") or {}).get("invoice_url") or ""
+    invoice_url = str(invoice_url).strip()
+    if not invoice_url:
+        raise GuideError(
+            "no guide for this portal and the ticket has no additional_info.invoice_url "
+            "to start from — add a guide or a starting URL"
+        )
+    if not invoice_url.startswith(("http://", "https://")):
+        invoice_url = "https://" + invoice_url
+
+    return Guide(
+        id=f"generic-{_host_slug(invoice_url)}",
+        description="Adaptive hint-guide for an unknown CFDI portal (no specific guide yet).",
+        domains=(),
+        rfcs=(),
+        portal_url=invoice_url,
+        required_ticket_fields=(),  # adapt to whatever the portal asks
+        required_fiscal_fields=("rfc", "nombre", "cp", "regimen_fiscal", "uso_cfdi", "email"),
+        invoicing_window_days=None,
+        ticket_field_map=tuple(sorted(DEFAULT_TICKET_FIELD_MAP.items())),
+        stop_before_labels=GENERIC_STOP_LABELS,
+        patience_max_reload_cycles=3,
+        patience_wait_seconds=10,
+        last_verified="never",
+        body=GENERIC_HINTS_BODY,
+        path=Path("<generic>"),
+        is_generic=True,
+    )
 
 
 def parse_guide(path: Path, allow_review_placeholder: bool = False) -> Guide:

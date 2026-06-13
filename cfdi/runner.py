@@ -107,9 +107,18 @@ def build_task(guide: Guide, ticket: dict, fiscal: dict, today: date,
         f"- {{{k}}} = {display_value(k, v)}"
         for k, v in placeholders.items() if v is not None
     )
+    # Unknown-portal runs: the default field map can't know this extractor's ticket
+    # shape, so hand the agent the raw ticket to pull número/fecha/total from itself.
+    raw_ticket = ""
+    if guide.is_generic:
+        raw_ticket = (
+            "\n\n# TICKET (raw JSON — read número/folio, fecha, and total from here "
+            "as the portal asks)\n" + json.dumps(ticket, ensure_ascii=False)
+        )
+    label = "MERCHANT GUIDE" if not guide.is_generic else "HINTS (no specific guide — adapt)"
     return (
         f"Generate — but do NOT submit — a CFDI invoice. {guide.description}\n\n"
-        f"# MERCHANT GUIDE ({guide.id}, verified {guide.last_verified})\n"
+        f"# {label} ({guide.id}, verified {guide.last_verified})\n"
         f"{guide.body}\n\n"
         f"# PATIENCE LIMITS\n"
         f"- wait_seconds: {guide.patience_wait_seconds}\n"
@@ -117,6 +126,7 @@ def build_task(guide: Guide, ticket: dict, fiscal: dict, today: date,
         f"{override}"
         f"# VALUES (substitute into the guide's {{placeholders}}; use verbatim)\n"
         f"{values}"
+        f"{raw_ticket}"
     )
 
 
@@ -272,6 +282,69 @@ def write_report(report: dict, ticket: dict, guide: Guide, runs_dir: Path) -> Pa
         "total": get_path(ticket, field_map["total"]),
     }}
     path.write_text(json.dumps(report_with_ticket, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def write_hint_draft(guide: Guide, ticket: dict, report: dict, drafts_dir: Path) -> Path:
+    """Turn a successful generic (guideless) run into a reviewable hint draft.
+
+    Captures what only a real run knows — the URL that rendered the form and the
+    EXACT final-submit label the agent saw — so a human can review and promote it
+    into guides/, making that portal precise and (optionally) automatable next time.
+    Drafts live in guides/_drafts/ (the runner never loads them).
+    """
+    from cfdi.matcher import normalize_domain
+
+    drafts_dir.mkdir(parents=True, exist_ok=True)
+    slug = guide.id.removeprefix("generic-")
+    domain = normalize_domain(guide.portal_url) or ""
+    final_url = report.get("final_url") or guide.portal_url
+    stop_label = (report.get("human_next_button") or "").strip() or "REVIEW_REQUIRED"
+    issuer_rfc = (ticket.get("issuer") or {}).get("rfc") or ""
+    filled = report.get("fields_filled") or "(see run report)"
+    filled_block = "\n".join(f"  {line}" for line in str(filled).splitlines()) or "  (none recorded)"
+
+    content = f"""---
+id: {slug}
+description: CFDI invoicing for {domain} — auto-drafted from a successful run; REVIEW.
+match:
+  domains: [{domain}]
+  rfcs: [{issuer_rfc}]
+portal_url: {final_url}
+required_ticket_fields: []
+required_fiscal_fields: [rfc, nombre, cp, regimen_fiscal, uso_cfdi, email]
+stop:
+  before_labels: ["{stop_label}"]
+patience: {{ max_reload_cycles: 3, wait_seconds: 10 }}
+last_verified: never
+---
+## Auto-drafted from a successful supervised run — REVIEW before promoting
+A generic (guideless) run completed this portal. Confirm the details below, add a
+`ticket_field_map` matching this merchant's ticket JSON, tighten the steps, then move
+this file into guides/ and set last_verified.
+
+## Observed in the run
+- URL that rendered the form: {final_url}
+- Final submit button observed: "{stop_label}"  ← this becomes the stop label; confirm it.
+- Fields filled:
+{filled_block}
+
+## Steps (refine from the observed flow)
+1. Start at the URL above. If it looks blank, apply the patience policy (slow SPA).
+2. Fill the receptor bundle (rfc, nombre, cp, régimen, uso, email) and the ticket
+   number/date/total into whatever fields this portal asks for.
+3. Régimen fiscal / Uso de CFDI are dropdowns — select the option by its name.
+
+## Error codes
+| portal message contains | meaning | action |
+|---|---|---|
+| ya facturado / previamente facturado | this ticket already has an invoice | abort with status already_invoiced |
+
+## Stop & completion
+Final button: "{stop_label}" — NEVER click it. Call ready_for_review when only it remains.
+"""
+    path = drafts_dir / f"{slug}.md"
+    path.write_text(content, encoding="utf-8")
     return path
 
 

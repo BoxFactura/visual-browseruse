@@ -21,10 +21,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from cfdi.guides import load_guides
+from cfdi.guides import GuideError, generic_guide, load_guides
 from cfdi.matcher import extract_signals, match
 from cfdi.preflight import get_path, interpret_purchase_date, preflight
-from cfdi.runner import STATUS_EXIT_CODES, notify_failure, run_agent, write_report
+from cfdi.runner import (
+    STATUS_EXIT_CODES, notify_failure, run_agent, write_hint_draft, write_report,
+)
 
 BASE = Path(__file__).parent
 
@@ -57,16 +59,23 @@ def main() -> int:
     else:
         signals = extract_signals(ticket)
         result = match(signals, guides)
-        if result.status == "no_match":
-            print(f"no guide matches this ticket (signals: domain={signals.domain!r}, "
-                  f"rfc={signals.rfc!r}). Write a guide or force one with --guide.")
-            return STATUS_EXIT_CODES["no_match"]
         if result.status == "conflict":
             print(f"matching conflict: ticket domain and issuer RFC point at different guides "
                   f"{result.candidates}. Resolve with --guide.")
             return STATUS_EXIT_CODES["conflict"]
-        guide = next(g for g in guides if g.id == result.guide_id)
-        print(f"matched guide: {guide.id} (tier: {result.tier})")
+        if result.status == "no_match":
+            try:
+                guide = generic_guide(ticket)
+            except GuideError as exc:
+                print(f"cannot run: {exc}")
+                return STATUS_EXIT_CODES["no_match"]
+            print(f"no guide for this portal — ADAPTIVE generic mode (supervised only), "
+                  f"starting at {guide.portal_url}")
+            print("  the final-submit gate is best-effort here; a human verifies, and a "
+                  "hint draft is written on success.")
+        else:
+            guide = next(g for g in guides if g.id == result.guide_id)
+            print(f"matched guide: {guide.id} (tier: {result.tier})")
 
     problems = preflight(ticket, fiscal, guide, today=date.today())
     if problems:
@@ -82,11 +91,22 @@ def main() -> int:
             print(f"note: {note}")
 
     headless = args.headless or bool(os.getenv("HEADLESS", "").strip())
-    if args.auto_submit:
+    auto_submit = args.auto_submit
+    if auto_submit and guide.is_generic:
+        print("note: --auto-submit ignored on an unknown portal — supervised first encounter.")
+        auto_submit = False
+    if auto_submit:
         print("AUTO-SUBMIT mode: the agent will emit the invoice itself.")
     report = run_agent(guide, ticket, fiscal, headless=headless, model=args.model,
-                       auto_submit=args.auto_submit)
+                       auto_submit=auto_submit)
     report_path = write_report(report, ticket, guide, BASE / "runs")
+
+    # Self-authoring: a successful first encounter teaches the portal's real flow.
+    if guide.is_generic and report["status"] == "ready_for_review":
+        draft = write_hint_draft(guide, ticket, report, BASE / "guides" / "_drafts")
+        print(f"self-authored hint draft: {draft}")
+        print("  review it (esp. stop.before_labels) and move into guides/ to make this "
+              "portal precise and repeatable.")
 
     print(f"\nstatus: {report['status']}")
     print(f"report: {report_path}")
