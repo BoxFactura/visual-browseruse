@@ -1,12 +1,15 @@
-"""Generate (but never submit) a CFDI invoice for a ticket, guided by a playbook.
+"""Generate a CFDI invoice for a ticket, guided by a playbook.
 
-    uv run facturar.py tickets/san-pablo-2026-06-01.json
+    uv run facturar.py ticket.json                # supervised: stops before submit
+    uv run facturar.py ticket.json --auto-submit  # unattended: emits the invoice
 
-Flow: load guides → match ticket → pre-flight → run the guarded browser agent →
-stop at the final-submit screen → the browser stays open so YOU verify and click
-the final button yourself. Exit codes: 0 ready_for_review, 2 no_match,
-3 conflict, 4 preflight_failed, 5 aborted/already_invoiced,
-6 incomplete_max_steps, 7 judge_failed.
+Flow: load guides → match ticket → pre-flight → run the guarded browser agent.
+Supervised (default): the agent stops at the final-submit screen and the browser
+stays open so YOU verify and click the final button yourself. Auto-submit: the
+agent clicks it and must capture the portal's confirmation (judge-checked).
+Exit codes: 0 ready_for_review/submitted, 2 no_match, 3 conflict,
+4 preflight_failed, 5 aborted/already_invoiced, 6 incomplete_max_steps,
+7 judge_failed.
 """
 
 import argparse
@@ -34,6 +37,10 @@ def main() -> int:
     parser.add_argument("--guide", help="force a guide id, skipping matching")
     parser.add_argument("--headless", action="store_true",
                         help="run headless (default: visible, also via HEADLESS env)")
+    parser.add_argument("--auto-submit", action="store_true",
+                        help="UNATTENDED MODE: the agent clicks the final submit and "
+                             "emits the invoice itself (no human stop). A stamped CFDI "
+                             "is only undone via SAT cancellation.")
     parser.add_argument("--model", default=os.getenv("INVOICE_MODEL", "gpt-5.4"))
     args = parser.parse_args()
 
@@ -75,18 +82,26 @@ def main() -> int:
             print(f"note: {note}")
 
     headless = args.headless or bool(os.getenv("HEADLESS", "").strip())
-    report = run_agent(guide, ticket, fiscal, headless=headless, model=args.model)
+    if args.auto_submit:
+        print("AUTO-SUBMIT mode: the agent will emit the invoice itself.")
+    report = run_agent(guide, ticket, fiscal, headless=headless, model=args.model,
+                       auto_submit=args.auto_submit)
     report_path = write_report(report, ticket, guide, BASE / "runs")
 
     print(f"\nstatus: {report['status']}")
     print(f"report: {report_path}")
 
-    if report["status"] != "ready_for_review":
+    if report["status"] not in ("ready_for_review", "submitted"):
         webhook = os.getenv("INVOICE_FAILURE_WEBHOOK_URL", "").strip()
         if webhook:
             persisted = json.loads(report_path.read_text(encoding="utf-8"))
             if notify_failure({**persisted, "report_file": report_path.name}, webhook):
                 print("failure report POSTed to INVOICE_FAILURE_WEBHOOK_URL")
+    if report["status"] == "submitted":
+        print("=" * 70)
+        print("INVOICE EMITTED — portal confirmation:")
+        print(report.get("confirmation", "(see report)"))
+        print("=" * 70)
     if report["status"] == "ready_for_review":
         print("=" * 70)
         print(f"STOPPED BEFORE FINAL SUBMIT — review the open browser window, then")

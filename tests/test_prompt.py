@@ -71,3 +71,45 @@ def test_policy_is_stable_and_mentions_the_three_mechanisms():
     assert "ready_for_review" in POLICY
     assert "set_masked_input" in POLICY
     assert "expected:" in POLICY
+
+
+def test_auto_submit_task_and_policy():
+    from cfdi.runner import POLICY_AUTO
+
+    prompt = build_task(SAN_PABLO, SAMPLE_TICKET, SAMPLE_FISCAL, today=date(2026, 6, 12),
+                        auto_submit=True)
+    assert "# MODE OVERRIDE — AUTO-SUBMIT" in prompt
+    assert prompt.index("# MODE OVERRIDE — AUTO-SUBMIT") < prompt.index("# VALUES")
+    supervised = build_task(SAN_PABLO, SAMPLE_TICKET, SAMPLE_FISCAL, today=date(2026, 6, 12))
+    assert "AUTO-SUBMIT" not in supervised
+
+    assert "confirm_emission" in POLICY_AUTO
+    assert "NEVER click a final submit button" not in POLICY_AUTO
+    assert "set_masked_input" in POLICY_AUTO
+
+
+def test_ground_truth_auto_submit():
+    assert ground_truth(SAN_PABLO, auto_submit=True) == (
+        "Success means: the invoice form was filled with the provided values, "
+        "the final submit button (Emitir Factura / Generar Factura y Enviar) WAS "
+        "clicked, the portal visibly confirmed the invoice was emitted "
+        "(confirmation message, folio fiscal or download links), and the agent "
+        "called confirm_emission. Stopping before submission, or claiming "
+        "emission without visible portal confirmation, means FAILURE."
+    )
+
+
+def test_derive_status_table():
+    from cfdi.runner import derive_status
+
+    ready = {"human_next_button": "Emitir Factura"}
+    emitted = {"confirmation": "Factura generada. Folio fiscal: AAA-BBB"}
+
+    assert derive_status(is_done=True, is_successful=True, is_validated=True, payload=ready) == "ready_for_review"
+    assert derive_status(is_done=True, is_successful=True, is_validated=False, payload=ready) == "ready_for_review"
+    assert derive_status(is_done=True, is_successful=True, is_validated=True, payload=emitted) == "submitted"
+    assert derive_status(is_done=True, is_successful=True, is_validated=None, payload=emitted) == "submitted"
+    assert derive_status(is_done=True, is_successful=True, is_validated=False, payload=emitted) == "judge_failed"
+    assert derive_status(is_done=True, is_successful=True, is_validated=False, payload={}) == "judge_failed"
+    assert derive_status(is_done=True, is_successful=False, is_validated=False, payload={}) == "aborted"
+    assert derive_status(is_done=False, is_successful=False, is_validated=None, payload={}) == "incomplete_max_steps"

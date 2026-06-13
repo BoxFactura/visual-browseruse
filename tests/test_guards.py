@@ -41,13 +41,36 @@ def test_custom_action_params_are_strict_schema_compatible():
     """OpenAI strict structured output 400s on dict-typed (arbitrary-key map)
     action params — every property must be an enumerated type. Regression test
     for the run that failed 6/6 steps with 'Invalid schema for response_format'."""
-    tools = build_tools(STOP)
+    cases = [
+        (build_tools(STOP), ("ready_for_review", "set_masked_input")),
+        (build_tools(STOP, auto_submit=True), ("confirm_emission", "set_masked_input")),
+    ]
+    for tools, names in cases:
+        actions = tools.registry.registry.actions
+        for name in names:
+            schema = actions[name].param_model.model_json_schema()
+            for prop_name, prop in schema.get("properties", {}).items():
+                is_map = prop.get("type") == "object" and "additionalProperties" in prop
+                assert not is_map, f"{name}.{prop_name} is a dict-typed param (breaks strict mode)"
+
+
+def test_auto_submit_registry_surface():
+    tools = build_tools(STOP, auto_submit=True)
     actions = tools.registry.registry.actions
-    for name in ("ready_for_review", "set_masked_input"):
-        schema = actions[name].param_model.model_json_schema()
-        for prop_name, prop in schema.get("properties", {}).items():
-            is_map = prop.get("type") == "object" and "additionalProperties" in prop
-            assert not is_map, f"{name}.{prop_name} is a dict-typed param (breaks strict mode)"
+
+    assert "confirm_emission" in actions
+    assert "ready_for_review" not in actions
+    assert "evaluate" not in actions
+    assert "send_keys" not in actions
+    assert actions["click"].description == "Click element by index."
+
+    assert_guards(tools, auto_submit=True)
+    try:
+        assert_guards(tools)  # supervised assertion must reject auto-mode tools
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("supervised assert_guards accepted auto-submit tools")
 
 
 def test_assert_guards_catches_unguarded_tools():
