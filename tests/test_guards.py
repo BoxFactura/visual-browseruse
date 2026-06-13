@@ -26,6 +26,9 @@ def test_registry_safety_surface():
 
     assert "evaluate" not in actions
     assert "send_keys" not in actions
+    assert "write_file" not in actions
+    assert "read_file" not in actions
+    assert "replace_file" not in actions
     assert "click" in actions
     assert actions["click"].description == (
         "Click element by index. Final-submit buttons are blocked and must be "
@@ -62,6 +65,7 @@ def test_auto_submit_registry_surface():
     assert "ready_for_review" not in actions
     assert "evaluate" not in actions
     assert "send_keys" not in actions
+    assert "write_file" not in actions
     assert actions["click"].description == "Click element by index."
 
     assert_guards(tools, auto_submit=True)

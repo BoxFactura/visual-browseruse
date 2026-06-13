@@ -169,19 +169,26 @@ def run_agent(guide: Guide, ticket: dict, fiscal: dict, *, headless: bool, model
     return asyncio.run(_drive(agent, browser, guide, headless))
 
 
-async def _safe_kill(browser) -> None:
-    """Close the browser, swallowing errors — a failed kill must not mask a result."""
+async def _safe_kill(browser, guide: Guide) -> None:
+    """Close the browser and clear its (now stale) profile lock files, swallowing
+    errors — a failed kill must not mask a result."""
     try:
         await browser.kill()
     except Exception:
         pass
+    profile = Path(f"{PROFILES_DIR}/{guide.id}").expanduser()
+    for lock in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+        try:
+            (profile / lock).unlink()
+        except (FileNotFoundError, OSError):
+            pass
 
 
 async def _drive(agent: Agent, browser: Browser, guide: Guide, headless: bool) -> dict:
     try:
         history = await agent.run(max_steps=40)
     except Exception as exc:  # browser/profile launch failures land here
-        await _safe_kill(browser)
+        await _safe_kill(browser, guide)
         message = str(exc)
         if "Failed to open a new tab" in message or "CDP" in message:
             message = (
@@ -196,7 +203,7 @@ async def _drive(agent: Agent, browser: Browser, guide: Guide, headless: bool) -
     # not orphan a Chrome that holds the profile lock for the next run.
     hold_for_human = (not headless) and report["status"] == "ready_for_review"
     if not hold_for_human:
-        await _safe_kill(browser)
+        await _safe_kill(browser, guide)
     report["_held_open"] = hold_for_human
     return report
 

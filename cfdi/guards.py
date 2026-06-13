@@ -72,10 +72,12 @@ def build_tools(stop_labels: tuple[str, ...], *, auto_submit: bool = False) -> T
     ends via ready_for_review. auto_submit=True: the built-in click stays (no
     deny-list) and the run ends via confirm_emission AFTER the agent submits."""
     tools = Tools()
-    # No raw JS (could form.submit()) and no keyboard shortcuts (Enter submits
-    # a focused form). exclude_action removes the action AND blocks re-registration.
-    tools.exclude_action("evaluate")
-    tools.exclude_action("send_keys")
+    # No raw JS (could form.submit()) and no keyboard shortcuts (Enter submits a
+    # focused form); no file-system scratchpad actions (irrelevant to invoicing —
+    # the agent wandered into write_file/replace_file note-taking, adding steps).
+    # exclude_action removes the action AND blocks re-registration.
+    for action in ("evaluate", "send_keys", "write_file", "read_file", "replace_file"):
+        tools.exclude_action(action)
 
     if not auto_submit:
 
