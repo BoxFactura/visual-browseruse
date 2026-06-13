@@ -43,9 +43,53 @@ def test_generic_guide_requires_a_starting_url():
     with pytest.raises(GuideError) as exc:
         generic_guide({"issuer": {"rfc": "XXX010101000"}, "additional_info": {}})
     assert str(exc.value) == (
-        "no guide for this portal and the ticket has no additional_info.invoice_url "
-        "to start from — add a guide or a starting URL"
+        "no guide for this portal and no invoicing URL found in the ticket "
+        "— add a guide or a starting URL"
     )
+
+
+# Real "Tiendas Extra" ticket shape: URL at facturacion.url, not the assumed key.
+EXTRA_TICKET = {
+    "store": {"name": "Tiendas Extra", "tax_id": "TEX9302097F3"},
+    "document": {"date": "2026-06-09"},
+    "totals": {"total": 126.0},
+    "facturacion": {"url": "https://facturacion.portalcsk.com/", "folio": "1279724"},
+    "raw_notes": ["Ticket heavily wrinkled; some values may be inaccurate."],
+}
+
+
+def test_find_invoice_url_scans_inconsistent_keys():
+    from cfdi.guides import find_invoice_url
+
+    assert find_invoice_url(EXTRA_TICKET) == "https://facturacion.portalcsk.com/"
+    assert find_invoice_url(AMORINO_TICKET) == "https://facturacion.amorinogelato.com"
+    assert find_invoice_url({"additional_info": {"invoice_url": "www.farmaciasanpablo.com.mx"}}) == \
+        "https://www.farmaciasanpablo.com.mx"
+    # no url-like value anywhere → None (prose, ids, amounts are not URLs)
+    assert find_invoice_url({"store": {"address": "Zavaleta 5567 Local 2"}, "total": "126.00"}) is None
+
+
+def test_find_invoice_url_prefers_invoicing_hint_over_other_urls():
+    from cfdi.guides import find_invoice_url
+
+    ticket = {
+        "store": {"website": "https://www.tiendasextra.com"},
+        "facturacion": {"url": "https://facturacion.portalcsk.com/"},
+    }
+    assert find_invoice_url(ticket) == "https://facturacion.portalcsk.com/"
+
+
+def test_generic_guide_on_extra_ticket_shape():
+    g = generic_guide(EXTRA_TICKET)
+    assert g.portal_url == "https://facturacion.portalcsk.com/"
+    assert g.id == "generic-facturacion-portalcsk-com"
+
+
+def test_matcher_signals_use_robust_url():
+    from cfdi.matcher import extract_signals, Signals
+
+    # URL under facturacion.url is still found for the domain signal
+    assert extract_signals(EXTRA_TICKET) == Signals(domain="portalcsk.com", rfc=None)
 
 
 def test_generic_stop_labels_are_high_confidence_only():

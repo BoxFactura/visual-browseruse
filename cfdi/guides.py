@@ -6,6 +6,7 @@ with up to ~100 guides a frontmatter scan takes milliseconds, and validating
 at load time removes generated-artifact sync risk.
 """
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -119,20 +120,60 @@ def _host_slug(url: str) -> str:
     return host.replace(".", "-") or "unknown-portal"
 
 
+_URL_HINT_WORDS = ("factura", "invoice", "cfdi", "portal")
+_URLISH = re.compile(r"^(https?://)?(www\.)?([a-z0-9-]+\.)+[a-z]{2,}(/[^\s]*)?$", re.I)
+
+
+def _walk_strings(obj, keypath=""):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            yield from _walk_strings(v, f"{keypath}.{k}" if keypath else str(k))
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            yield from _walk_strings(v, f"{keypath}[{i}]")
+    elif isinstance(obj, str):
+        yield keypath, obj
+
+
+def find_invoice_url(ticket: dict) -> str | None:
+    """Most likely invoicing-portal URL in a ticket, normalized to https.
+
+    Extractors put the URL under inconsistent keys (additional_info.invoice_url,
+    facturacion.url, ...), so compile EVERY url-like value and score by invoicing
+    hints in the key path and host rather than trust one key. Returns None if the
+    ticket carries no url-like value at all.
+    """
+    best, best_score = None, -1
+    for keypath, raw in _walk_strings(ticket):
+        s = raw.strip()
+        if not s or " " in s or "@" in s or not _URLISH.match(s):
+            continue
+        host = s.split("//", 1)[-1].split("/", 1)[0].lower()
+        score = 0
+        if any(w in keypath.lower() for w in _URL_HINT_WORDS):
+            score += 3
+        if any(w in host for w in _URL_HINT_WORDS):
+            score += 2
+        if s.lower().startswith("http"):
+            score += 1
+        if score > best_score:
+            best, best_score = s, score
+    if best is None:
+        return None
+    return best if best.lower().startswith(("http://", "https://")) else "https://" + best
+
+
 def generic_guide(ticket: dict) -> Guide:
     """Synthesize an adaptive hint-guide for a portal we have no guide for.
 
     Raises GuideError if the ticket carries no invoicing URL to start from.
     """
-    invoice_url = (ticket.get("additional_info") or {}).get("invoice_url") or ""
-    invoice_url = str(invoice_url).strip()
+    invoice_url = find_invoice_url(ticket)
     if not invoice_url:
         raise GuideError(
-            "no guide for this portal and the ticket has no additional_info.invoice_url "
-            "to start from — add a guide or a starting URL"
+            "no guide for this portal and no invoicing URL found in the ticket "
+            "— add a guide or a starting URL"
         )
-    if not invoice_url.startswith(("http://", "https://")):
-        invoice_url = "https://" + invoice_url
 
     return Guide(
         id=f"generic-{_host_slug(invoice_url)}",

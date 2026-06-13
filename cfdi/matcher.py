@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 import tldextract
 
-from cfdi.guides import Guide
+from cfdi.guides import Guide, find_invoice_url
 
 # Offline: empty suffix_list_urls uses the bundled PSL snapshot, no network fetch.
 _extract = tldextract.TLDExtract(suffix_list_urls=())
@@ -41,7 +41,7 @@ def normalize_domain(url: str) -> str | None:
 
 
 def extract_signals(ticket: dict) -> Signals:
-    invoice_url = (ticket.get("additional_info") or {}).get("invoice_url") or ""
+    invoice_url = find_invoice_url(ticket) or ""
     rfc = (ticket.get("issuer") or {}).get("rfc") or None
     return Signals(
         domain=normalize_domain(invoice_url),
