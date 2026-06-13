@@ -76,7 +76,7 @@ def main() -> int:
 
     headless = args.headless or bool(os.getenv("HEADLESS", "").strip())
     report = run_agent(guide, ticket, fiscal, headless=headless, model=args.model)
-    report_path = write_report(report, ticket, BASE / "runs")
+    report_path = write_report(report, ticket, guide, BASE / "runs")
 
     print(f"\nstatus: {report['status']}")
     print(f"report: {report_path}")

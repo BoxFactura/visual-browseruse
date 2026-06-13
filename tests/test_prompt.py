@@ -53,6 +53,20 @@ def test_transposed_ticket_date_is_resolved_in_prompt():
     assert "2026-11-06" not in prompt
 
 
+def test_write_report_uses_guide_field_map(tmp_path):
+    from cfdi.runner import write_report
+
+    amorino = parse_guide(REPO / "guides" / "amorino-gelato.md")
+    ticket = {"invoice": {"invoice_number": "369636"}, "summary": {"total": 195.0}}
+    path = write_report({"status": "aborted", "guide_id": "amorino-gelato"}, ticket, amorino, tmp_path)
+    assert path.name.endswith("-amorino-gelato-369636.json")
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        "status": "aborted",
+        "guide_id": "amorino-gelato",
+        "ticket": {"folio": "369636", "total": 195.0},
+    }
+
+
 def test_policy_is_stable_and_mentions_the_three_mechanisms():
     assert "ready_for_review" in POLICY
     assert "set_masked_input" in POLICY

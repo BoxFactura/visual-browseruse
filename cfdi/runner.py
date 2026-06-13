@@ -134,9 +134,11 @@ def _report_from_history(history, guide: Guide) -> dict:
 
     if history.is_done() and history.is_successful() and "human_next_button" in payload:
         status = "ready_for_review"
-    elif history.is_done() and history.is_judged() and history.is_validated() is False:
+    elif history.is_done() and history.is_successful() and history.is_validated() is False:
+        # the agent CLAIMED success but the judge disagreed — needs human eyes
         status = "judge_failed"
     elif history.is_done():
+        # deliberate abort (error-map row, blocked flow): not a judge matter
         status = "aborted"
     else:
         status = "incomplete_max_steps"
@@ -161,14 +163,15 @@ def _report_from_history(history, guide: Guide) -> dict:
     }
 
 
-def write_report(report: dict, ticket: dict, runs_dir: Path) -> Path:
+def write_report(report: dict, ticket: dict, guide: Guide, runs_dir: Path) -> Path:
     runs_dir.mkdir(parents=True, exist_ok=True)
-    folio = get_path(ticket, "invoice_data.facturacion_folio") or "no-folio"
+    field_map = dict(guide.ticket_field_map)
+    folio = get_path(ticket, field_map["facturacion_folio"]) or "no-folio"
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     path = runs_dir / f"{stamp}-{report.get('guide_id', 'unknown')}-{folio}.json"
     report_with_ticket = {**report, "ticket": {
         "folio": folio,
-        "total": get_path(ticket, "purchase.total"),
+        "total": get_path(ticket, field_map["total"]),
     }}
     path.write_text(json.dumps(report_with_ticket, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
