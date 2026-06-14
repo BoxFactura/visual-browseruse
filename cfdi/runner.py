@@ -35,12 +35,11 @@ You operate Mexican CFDI self-invoicing portals following a per-merchant guide.
 Global rules, in priority order:
 {mode_rule}
 - Work in Spanish; portals are in Spanish.
-- Régimen fiscal and uso de CFDI are dropdowns of full SAT names, not codes.
-  Select the option whose text matches the name given after the code in VALUES
-  (e.g. "603 - Personas Morales con Fines no Lucrativos" → pick exactly that
-  option). After selecting, VERIFY the dropdown shows that name; if the only
-  available options don't include it, stop and report — do not accept a
-  different régimen.
+- Régimen fiscal is a dropdown of full SAT names — select the option matching the
+  name after the code in VALUES, then verify it; if it isn't offered, stop and report.
+- Uso de CFDI in VALUES may be an ORDERED list ("A - ... then B - ..."). Select the
+  FIRST listed uso that the dropdown actually offers — portals often don't offer every
+  uso. If none of the listed usos are offered, stop and report.
 - Amount fields: enter them with type_slowly using the EXACT decimal value (e.g. type
   "2306.00") — type_slowly types real keystrokes with a delay and blurs, so a masked field
   formats correctly. Then VERIFY the field shows that amount (e.g. $2,306.00), NEVER the raw
@@ -101,8 +100,12 @@ def display_value(key: str, value) -> str:
     code = str(value)
     if key == "regimen_fiscal" and code in REGIMEN_FISCAL:
         return f"{code} - {REGIMEN_FISCAL[code]}"
-    if key == "uso_cfdi" and code in USO_CFDI:
-        return f"{code} - {USO_CFDI[code]}"
+    if key == "uso_cfdi":
+        codes = value if isinstance(value, list) else [value]
+        named = [f"{c} - {USO_CFDI[c]}" if str(c) in USO_CFDI else str(c) for c in codes]
+        if len(named) > 1:
+            return " then ".join(named) + "  (use the FIRST the dropdown offers)"
+        return named[0] if named else str(value)
     return str(value)
 
 

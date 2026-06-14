@@ -123,9 +123,11 @@ def validate_fiscal(fiscal: dict, required_fields: tuple[str, ...]) -> list[str]
     regimen = fiscal.get("regimen_fiscal")
     if regimen and str(regimen) not in REGIMEN_FISCAL:
         errors.append(f"fiscal data: regimen_fiscal '{regimen}' is not in the SAT c_RegimenFiscal catalog")
+    # uso_cfdi may be a single code or an ordered preference list (try first, fall to next).
     uso = fiscal.get("uso_cfdi")
-    if uso and str(uso) not in USO_CFDI:
-        errors.append(f"fiscal data: uso_cfdi '{uso}' is not in the vendored c_UsoCFDI catalog")
+    for code in (uso if isinstance(uso, list) else [uso] if uso else []):
+        if str(code) not in USO_CFDI:
+            errors.append(f"fiscal data: uso_cfdi '{code}' is not in the vendored c_UsoCFDI catalog")
     return errors
 
 

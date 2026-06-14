@@ -46,6 +46,14 @@ def test_g03_with_612_passes():
     assert validate_fiscal(GOOD_FISCAL, ALL_FISCAL_FIELDS) == []
 
 
+def test_uso_cfdi_ordered_list_validated():
+    # a list of valid usos passes; an unknown code in the list is flagged by name
+    assert validate_fiscal(GOOD_FISCAL | {"uso_cfdi": ["G03", "D01"]}, ALL_FISCAL_FIELDS) == []
+    assert validate_fiscal(GOOD_FISCAL | {"uso_cfdi": ["G03", "Z99"]}, ALL_FISCAL_FIELDS) == [
+        "fiscal data: uso_cfdi 'Z99' is not in the vendored c_UsoCFDI catalog"
+    ]
+
+
 def test_bad_rfc_cp_email_all_reported_at_once():
     fiscal = GOOD_FISCAL | {"rfc": "NOPE", "cp": "123", "email": "not-an-email"}
     assert validate_fiscal(fiscal, ALL_FISCAL_FIELDS) == [

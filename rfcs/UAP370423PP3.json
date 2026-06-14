@@ -1,0 +1,8 @@
+{
+  "rfc": "UAP370423PP3",
+  "nombre": "UNIVERSIDAD AUTONOMA DE PUEBLA",
+  "cp": "72000",
+  "regimen_fiscal": "603",
+  "uso_cfdi": ["G03", "D01"],
+  "email": "abc@boxfactura.com"
+}

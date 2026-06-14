@@ -42,7 +42,9 @@ last_verified: 2026-06-14
    c. VERIFY the autofilled values match what was provided ({nombre}, {cp}, {regimen_fiscal}).
       If an autofilled value differs, do NOT blindly override it — a mismatch will trigger
       CFDI40147 at submit; stop and report it.
-   d. Fill anything the lookup left empty: Uso de CFDI {uso_cfdi}, email {email}.
+   d. Fill anything the lookup left empty: email {email}, and Uso de CFDI — pick the
+      FIRST option from {uso_cfdi} that the dropdown offers (it may only offer some, e.g.
+      D01/D02/D04/S01).
    expected: régimen fiscal and uso de CFDI are dropdowns — select by the name after the
    code; the uso de CFDI option may not appear until régimen fiscal is set.
 

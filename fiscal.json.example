@@ -3,6 +3,6 @@
   "nombre": "Nombre Exacto Como En Constancia",
   "cp": "01000",
   "regimen_fiscal": "612",
-  "uso_cfdi": "G03",
+  "uso_cfdi": ["G03", "D01"],
   "email": "you@example.com"
 }
