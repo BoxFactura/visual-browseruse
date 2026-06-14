@@ -4,8 +4,9 @@ Reports ALL problems at once (not first-only). The SAT catalogs are vendored
 below — they change rarely; the phase-2 compiler PR owns keeping them current.
 """
 
+import calendar
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from cfdi.guides import Guide
 
@@ -77,6 +78,20 @@ def interpret_purchase_date(raw: str, today: date) -> tuple[date | None, str | N
     return (literal, None) if literal else (None, None)
 
 
+def invoice_cutoff(purchased: date, window_days: int | None) -> tuple[date, str]:
+    """Latest date a purchase can still be self-invoiced.
+
+    GLOBAL DEFAULT (window_days is None): the end of the purchase month — almost
+    all Mexican portals close self-invoicing at month-end. A guide overrides this
+    with invoicing_window.max_days_after_purchase (a rolling N-day window, e.g.
+    San Pablo's 180 days).
+    """
+    if window_days is not None:
+        return purchased + timedelta(days=window_days), f"{window_days} days after purchase"
+    last_day = calendar.monthrange(purchased.year, purchased.month)[1]
+    return date(purchased.year, purchased.month, last_day), "default: end of the purchase month"
+
+
 def get_path(data: dict, dotted: str):
     current = data
     for part in dotted.split("."):
@@ -143,12 +158,13 @@ def validate_ticket(ticket: dict, guide: Guide, today: date) -> list[str]:
             errors.append(f"ticket: {date_path} {raw_date!r} is not a YYYY-MM-DD date")
         elif purchased > today:
             errors.append(f"ticket: {date_path} {purchased.isoformat()} is in the future")
-        elif guide.invoicing_window_days is not None:
-            age = (today - purchased).days
-            if age > guide.invoicing_window_days:
+        else:
+            cutoff, desc = invoice_cutoff(purchased, guide.invoicing_window_days)
+            if today > cutoff:
                 errors.append(
-                    f"ticket: purchase is {age} days old; guide {guide.id} allows invoicing "
-                    f"within {guide.invoicing_window_days} days"
+                    f"ticket: purchase {purchased.isoformat()} is past the invoicing window "
+                    f"(cutoff {cutoff.isoformat()} — {desc}). If this portal allows longer, set "
+                    f"invoicing_window.max_days_after_purchase in the guide."
                 )
     return errors
 

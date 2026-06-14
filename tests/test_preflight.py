@@ -82,11 +82,43 @@ def test_ticket_missing_required_field():
 
 
 def test_ticket_outside_invoicing_window():
+    # los-pollos overrides with a rolling 30-day window
     ticket = pollos_ticket()
     ticket["purchase"]["date"] = "2026-01-05"
     assert validate_ticket(ticket, POLLOS, today=date(2026, 6, 12)) == [
-        "ticket: purchase is 158 days old; guide los-pollos-hermanos allows invoicing within 30 days"
+        "ticket: purchase 2026-01-05 is past the invoicing window (cutoff 2026-02-04 — "
+        "30 days after purchase). If this portal allows longer, set "
+        "invoicing_window.max_days_after_purchase in the guide."
     ]
+
+
+def _lean_guide(tmp_path):
+    from cfdi.guides import parse_guide
+
+    p = tmp_path / "lean.md"
+    p.write_text(
+        "---\nid: lean\ndescription: d\nmatch:\n  domains: [lean.com]\n"
+        "portal_url: https://lean.com/\n---\nhint\n",
+        encoding="utf-8",
+    )
+    return parse_guide(p)
+
+
+def test_global_default_window_is_end_of_purchase_month(tmp_path):
+    # a guide with no invoicing_window → global default: end of the purchase month
+    guide = _lean_guide(tmp_path)
+    last_month = {"purchase": {"date": "2026-05-20", "total": 100.0}}
+    assert validate_ticket(last_month, guide, today=date(2026, 6, 12)) == [
+        "ticket: purchase 2026-05-20 is past the invoicing window (cutoff 2026-05-31 — "
+        "default: end of the purchase month). If this portal allows longer, set "
+        "invoicing_window.max_days_after_purchase in the guide."
+    ]
+
+
+def test_global_default_window_same_month_passes(tmp_path):
+    guide = _lean_guide(tmp_path)
+    same_month = {"purchase": {"date": "2026-06-09", "total": 100.0}}
+    assert validate_ticket(same_month, guide, today=date(2026, 6, 12)) == []
 
 
 def test_interpret_purchase_date_table():
