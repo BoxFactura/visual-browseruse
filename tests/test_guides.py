@@ -93,19 +93,21 @@ def test_missing_keys_rejected(tmp_path):
     with pytest.raises(GuideError) as exc:
         parse_guide(tmp_path / "bad.md")
     assert str(exc.value) == (
-        "bad.md: missing frontmatter keys: description, match, portal_url, stop"
+        "bad.md: missing frontmatter keys: description, match, portal_url"
     )
 
 
 def test_minimal_guide_just_hints(tmp_path):
-    # A guide can be just essentials + a few hint lines; the rest defaults.
+    # Leanest guide: id + description + match + portal_url + a few hints. No stop —
+    # the agent figures out the final-submit button; defaults fill everything else.
+    from cfdi.guides import GENERIC_STOP_LABELS
+
     (tmp_path / "min.md").write_text(
         "---\n"
         "id: tiendas-extra\n"
         "description: CFDI invoicing for Tiendas Extra.\n"
         "match:\n  domains: [portalcsk.com]\n"
         "portal_url: https://facturacion.portalcsk.com/\n"
-        "stop:\n  before_labels: [\"Generar Factura\"]\n"
         "---\n"
         "- the total field has a mask: type digits only\n"
         "- after RFC, click \"Buscar cliente\" to autofill\n",
@@ -115,7 +117,8 @@ def test_minimal_guide_just_hints(tmp_path):
     assert g.id == "tiendas-extra"
     assert g.domains == ("portalcsk.com",)
     assert g.portal_url == "https://facturacion.portalcsk.com/"
-    assert g.stop_before_labels == ("Generar Factura",)
+    # no stop declared → falls back to the default emit-verb safety net
+    assert g.stop_before_labels == GENERIC_STOP_LABELS
     # defaults applied
     assert g.required_ticket_fields == ()
     assert g.required_fiscal_fields == ("rfc", "nombre", "cp", "regimen_fiscal", "uso_cfdi", "email")

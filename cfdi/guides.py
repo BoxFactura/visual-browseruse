@@ -14,7 +14,7 @@ import yaml
 
 # A guide can be just a few hints: only the essentials are required; the rest
 # default so a new guide is id + description + match + portal_url + stop + body.
-REQUIRED_KEYS = ["id", "description", "match", "portal_url", "stop"]
+REQUIRED_KEYS = ["id", "description", "match", "portal_url"]
 
 # Universal receptor bundle — the default required_fiscal_fields for any guide.
 DEFAULT_FISCAL_FIELDS = ("rfc", "nombre", "cp", "regimen_fiscal", "uso_cfdi", "email")
@@ -98,11 +98,13 @@ First encounter with this portal — a human verifies. NEVER click a final emit 
 When the form is filled and only that button remains, call ready_for_review with the
 EXACT label of that button — that is what teaches the portal's real stop label."""
 
-# High-confidence final-emit verbs to block mechanically on an unknown portal.
-# Bare "Generar Factura" is deliberately excluded — it is the ENTRY button on some
-# portals (San Pablo) and the FINAL button on others (Amorino); the exact label is
-# portal-specific, which is precisely why a per-portal hint is required. Generic runs
-# cover the gap by being supervised-only + the strong prompt rule above.
+# High-confidence final-emit verbs the click-guard blocks by default — for unknown
+# portals AND any guide that doesn't declare its own stop.before_labels. The agent
+# is told to recognize the final-submit button itself (its policy); this is the
+# mechanical safety net under that judgment. Bare "Generar Factura" is deliberately
+# excluded — it's the ENTRY button on some portals (San Pablo) and the FINAL button
+# on others (Amorino), so it can't be blocked blindly; a guide adds the exact label
+# only when it wants precision (e.g. for unattended auto-submit).
 GENERIC_STOP_LABELS = (
     "Timbrar", "Emitir Factura", "Emitir CFDI", "Generar CFDI",
     "Generar Factura y Enviar", "Generar y Enviar", "Enviar Factura", "Facturar y Enviar",
@@ -216,10 +218,10 @@ def parse_guide(path: Path, allow_review_placeholder: bool = False) -> Guide:
         if "/" in d or d.startswith("www."):
             raise GuideError(f"{path.name}: match.domains entries must be bare eTLD+1, got {d!r}")
 
-    stop = fm["stop"]
-    labels = tuple(str(s) for s in stop.get("before_labels", []))
-    if not labels:
-        raise GuideError(f"{path.name}: stop.before_labels must not be empty")
+    # stop is optional: omit it and the agent figures out the final-submit button
+    # (per its policy), with the default emit-verb set as the mechanical safety net.
+    stop = fm.get("stop") or {}
+    labels = tuple(str(s) for s in stop.get("before_labels", [])) or GENERIC_STOP_LABELS
     if "REVIEW_REQUIRED" in labels and not allow_review_placeholder:
         raise GuideError(
             f"{path.name}: stop.before_labels contains the compiler placeholder "
