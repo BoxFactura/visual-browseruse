@@ -38,7 +38,7 @@ def test_parse_real_san_pablo_guide():
     assert guide.id == "farmacia-san-pablo"
     assert guide.domains == ("farmaciasanpablo.com.mx",)
     assert guide.rfcs == ("PPL961114GZ1",)
-    assert guide.portal_url == "https://www.farmaciasanpablo.com.mx/electronic-billing"
+    assert guide.portal_url == "https://emision-sanpablo-portal-auto-prod.pegasotecnologia.mx/"
     assert guide.stop_before_labels == ("Emitir Factura", "Generar Factura y Enviar")
     assert guide.invoicing_window_days == 180
     assert guide.patience_max_reload_cycles == 3
