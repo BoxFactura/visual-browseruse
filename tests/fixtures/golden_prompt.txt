@@ -24,16 +24,15 @@ Generate — but do NOT submit — a CFDI invoice. CFDI 4.0 self-invoicing on Fa
    If an alert says "No se encontró el recibo": re-verify folio and total once; if it
    repeats, abort — the ticket data is wrong.
    verify: the receptor fiscal-data form appears with the purchase concept listed.
-6. Receptor fiscal data — let the portal autofill from the RFC:
+6. Receptor fiscal data — do these IN ORDER; each step unlocks the next:
    a. Enter RFC {rfc}.
-   b. Click "Buscar cliente" — this AUTOFILLS receptor data (e.g. nombre, código postal,
-      régimen fiscal) from the saved record.
-   c. VERIFY the autofilled values match what was provided ({nombre}, {cp}, {regimen_fiscal}).
-      If an autofilled value differs, do NOT blindly override it — a mismatch will trigger
-      CFDI40147 at submit; stop and report it.
-   d. Fill anything the lookup left empty: email {email}, and Uso de CFDI — pick the
-      FIRST option from {uso_cfdi} that the dropdown offers (it may only offer some, e.g.
-      D01/D02/D04/S01).
+   b. Click "Buscar cliente" — it autofills the receptor data on file (e.g. nombre,
+      código postal). Verify they match {nombre}, {cp}; if one differs, don't override it
+      blindly — a mismatch triggers CFDI40147 at submit; stop and report.
+   c. Select Régimen Fiscal {regimen_fiscal} (match it by name).
+   d. Selecting régimen ENABLES the Uso de CFDI dropdown — only now select the FIRST
+      option from {uso_cfdi} that it offers (it may only offer some, e.g. D01/D02/D04/S01).
+   e. Fill email {email} if the lookup left it empty.
    expected: régimen fiscal and uso de CFDI are dropdowns — select by the name after the
    code; the uso de CFDI option may not appear until régimen fiscal is set.
 
@@ -43,7 +42,8 @@ Generate — but do NOT submit — a CFDI invoice. CFDI 4.0 self-invoicing on Fa
 | Total mask mangles the amount | type it with type_slowly (real keys + blur), the exact value e.g. "2306.00"; then verify |
 | page blank for >10s | patience policy: wait, reload, max cycles per policy — never declare the site down before exhausting them |
 | promo popup blocks the page | close it via its X before anything else |
-| receptor fields blank / CP disabled | enter RFC, then click "Buscar cliente" — it autofills nombre/CP/régimen; verify them, don't hand-type over them |
+| receptor fields blank / CP disabled | enter RFC, then click "Buscar cliente" — it autofills nombre/CP; verify them, don't hand-type over them, then select régimen and uso |
+| Uso de CFDI dropdown is empty/disabled | it stays locked until Régimen Fiscal is selected — set régimen first, then the uso options appear |
 
 ## Error codes
 | portal message contains | meaning | action |
