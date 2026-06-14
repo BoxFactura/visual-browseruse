@@ -121,10 +121,11 @@ def build_task(guide: Guide, ticket: dict, fiscal: dict, today: date,
         f"- {{{k}}} = {display_value(k, v)}"
         for k, v in placeholders.items() if v is not None
     )
-    # Unknown-portal runs: the default field map can't know this extractor's ticket
-    # shape, so hand the agent the raw ticket to pull número/fecha/total from itself.
+    # If the ticket_field_map didn't resolve the core values (lean guide, or an
+    # extractor shape the map doesn't fit) — or it's a generic run — hand the agent
+    # the raw ticket to pull número/fecha/total from itself. No per-portal map needed.
     raw_ticket = ""
-    if guide.is_generic:
+    if guide.is_generic or any(placeholders.get(k) is None for k in ("facturacion_folio", "total")):
         raw_ticket = (
             "\n\n# TICKET (raw JSON — read número/folio, fecha, and total from here "
             "as the portal asks)\n" + json.dumps(ticket, ensure_ascii=False)

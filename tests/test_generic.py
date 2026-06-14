@@ -111,6 +111,22 @@ def test_generic_build_task_includes_raw_ticket_and_hints_label():
     assert "- {uso_cfdi} = G03 - Gastos en general" in prompt
 
 
+def test_matched_lean_guide_gets_raw_ticket_when_map_unresolved(tmp_path):
+    # A lean guide (default field map) on a foreign-shape ticket: the mapped values
+    # don't resolve, so the agent is handed the raw ticket — no per-portal map needed.
+    from cfdi.guides import parse_guide
+
+    (tmp_path / "lean.md").write_text(
+        "---\nid: tiendas-extra\ndescription: d\nmatch:\n  domains: [portalcsk.com]\n"
+        "portal_url: https://facturacion.portalcsk.com/\n---\n- a hint\n",
+        encoding="utf-8",
+    )
+    g = parse_guide(tmp_path / "lean.md")
+    prompt = build_task(g, EXTRA_TICKET, FISCAL, today=date(2026, 6, 12))
+    assert "# TICKET (raw JSON" in prompt
+    assert '"folio": "1279724"' in prompt
+
+
 def test_matched_guide_task_has_no_raw_ticket_dump():
     from cfdi.guides import parse_guide
     g = parse_guide(Path(__file__).parent.parent / "guides" / "amorino-gelato.md")
