@@ -101,6 +101,15 @@ def main() -> int:
             guide = next(g for g in guides if g.id == result.guide_id)
             print(f"matched guide: {guide.id} (tier: {result.tier})")
 
+    if guide.is_generic:
+        print("hint file: (none — synthesized adaptive generic guide)")
+    else:
+        try:
+            source = guide.path.relative_to(BASE)
+        except ValueError:
+            source = guide.path
+        print(f"hint file: {source}")
+
     problems = preflight(ticket, fiscal, guide, today=date.today())
     if problems:
         print(f"pre-flight failed — fix before any browser opens ({len(problems)} problem(s)):")
