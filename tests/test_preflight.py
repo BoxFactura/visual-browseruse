@@ -30,7 +30,7 @@ def test_good_fiscal_and_ticket_pass():
 def test_missing_regimen_fiscal_named_exactly():
     fiscal = {k: v for k, v in GOOD_FISCAL.items() if k != "regimen_fiscal"}
     assert validate_fiscal(fiscal, ALL_FISCAL_FIELDS) == [
-        "fiscal.json: missing required field 'regimen_fiscal' "
+        "fiscal data: missing required field 'regimen_fiscal' "
         '(3-digit SAT code, e.g. "612" — it is on your Constancia de Situación Fiscal)'
     ]
 
@@ -38,7 +38,7 @@ def test_missing_regimen_fiscal_named_exactly():
 def test_g03_with_605_rejected_naming_valid_usos():
     fiscal = GOOD_FISCAL | {"regimen_fiscal": "605"}
     assert validate_fiscal(fiscal, ALL_FISCAL_FIELDS) == [
-        "fiscal.json: uso_cfdi G03 (Gastos en general) is not SAT-valid for régimen 605 "
+        "fiscal data: uso_cfdi G03 (Gastos en general) is not SAT-valid for régimen 605 "
         "(Sueldos y Salarios e Ingresos Asimilados a Salarios); valid usos for your régimen: D01, S01"
     ]
 
@@ -46,7 +46,7 @@ def test_g03_with_605_rejected_naming_valid_usos():
 def test_g03_with_616_rejected():
     fiscal = GOOD_FISCAL | {"regimen_fiscal": "616"}
     assert validate_fiscal(fiscal, ALL_FISCAL_FIELDS) == [
-        "fiscal.json: uso_cfdi G03 (Gastos en general) is not SAT-valid for régimen 616 "
+        "fiscal data: uso_cfdi G03 (Gastos en general) is not SAT-valid for régimen 616 "
         "(Sin obligaciones fiscales); valid usos for your régimen: S01"
     ]
 
@@ -58,17 +58,17 @@ def test_g03_with_612_passes():
 def test_bad_rfc_cp_email_all_reported_at_once():
     fiscal = GOOD_FISCAL | {"rfc": "NOPE", "cp": "123", "email": "not-an-email"}
     assert validate_fiscal(fiscal, ALL_FISCAL_FIELDS) == [
-        "fiscal.json: rfc 'NOPE' is not a valid RFC (12/13 chars: AAAA999999XXX)",
-        "fiscal.json: cp '123' must be exactly 5 digits",
-        "fiscal.json: email 'not-an-email' does not look like an email address",
+        "fiscal data: rfc 'NOPE' is not a valid RFC (12/13 chars: AAAA999999XXX)",
+        "fiscal data: cp '123' must be exactly 5 digits",
+        "fiscal data: email 'not-an-email' does not look like an email address",
     ]
 
 
 def test_unknown_codes_rejected():
     fiscal = GOOD_FISCAL | {"regimen_fiscal": "999", "uso_cfdi": "Z99"}
     assert validate_fiscal(fiscal, ALL_FISCAL_FIELDS) == [
-        "fiscal.json: regimen_fiscal '999' is not in the SAT c_RegimenFiscal catalog",
-        "fiscal.json: uso_cfdi 'Z99' is not in the vendored c_UsoCFDI catalog",
+        "fiscal data: regimen_fiscal '999' is not in the SAT c_RegimenFiscal catalog",
+        "fiscal data: uso_cfdi 'Z99' is not in the vendored c_UsoCFDI catalog",
     ]
 
 

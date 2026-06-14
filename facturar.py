@@ -1,9 +1,10 @@
 """Generate a CFDI invoice for a ticket, guided by a playbook.
 
-    uv run facturar.py ticket.json                # supervised: stops before submit
-    uv run facturar.py ticket.json --auto-submit  # unattended: emits the invoice
+    uv run facturar.py <RFC> ticket.json                # supervised: stops before submit
+    uv run facturar.py <RFC> ticket.json --auto-submit  # unattended: emits the invoice
 
-Flow: load guides → match ticket → pre-flight → run the guarded browser agent.
+The receptor's fiscal data is selected by RFC from rfcs/<RFC>.json (one file per
+receptor). Flow: load guides → match ticket → pre-flight → run the guarded browser agent.
 Supervised (default): the agent stops at the final-submit screen and the browser
 stays open so YOU verify and click the final button yourself. Auto-submit: the
 agent clicks it and must capture the portal's confirmation (judge-checked).
@@ -34,8 +35,8 @@ BASE = Path(__file__).parent
 def main() -> int:
     load_dotenv()
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("rfc", help="receptor RFC — selects fiscal data from rfcs/<RFC>.json")
     parser.add_argument("ticket", type=Path, help="ticket JSON file")
-    parser.add_argument("--fiscal", type=Path, default=BASE / "fiscal.json")
     guide_sel = parser.add_mutually_exclusive_group()
     guide_sel.add_argument("--guide", help="force a guide id, skipping matching")
     guide_sel.add_argument("--no-guide", action="store_true",
@@ -51,9 +52,19 @@ def main() -> int:
     parser.add_argument("--model", default=os.getenv("INVOICE_MODEL", "gpt-5.4"))
     args = parser.parse_args()
 
+    rfc = args.rfc.strip().upper()
+    fiscal_path = BASE / "rfcs" / f"{rfc}.json"
+    if not fiscal_path.exists():
+        available = sorted(p.stem for p in (BASE / "rfcs").glob("*.json"))
+        print(f"no fiscal data for RFC {rfc}: expected {fiscal_path}")
+        print(f"  available RFCs: {', '.join(available) or '(none — add rfcs/<RFC>.json)'}")
+        return STATUS_EXIT_CODES["preflight_failed"]
+
     guides = load_guides(BASE / "guides")
     ticket = json.loads(args.ticket.read_text(encoding="utf-8"))
-    fiscal = json.loads(args.fiscal.read_text(encoding="utf-8"))
+    fiscal = json.loads(fiscal_path.read_text(encoding="utf-8"))
+    if str(fiscal.get("rfc", "")).upper() != rfc:
+        print(f"warning: {fiscal_path.name} contains rfc {fiscal.get('rfc')!r}, not {rfc}")
 
     if args.no_guide:
         try:

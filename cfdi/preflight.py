@@ -93,31 +93,31 @@ def validate_fiscal(fiscal: dict, required_fields: tuple[str, ...]) -> list[str]
             hint = ""
             if key == "regimen_fiscal":
                 hint = ' (3-digit SAT code, e.g. "612" — it is on your Constancia de Situación Fiscal)'
-            errors.append(f"fiscal.json: missing required field '{key}'{hint}")
+            errors.append(f"fiscal data: missing required field '{key}'{hint}")
 
     rfc = fiscal.get("rfc")
     if rfc and not RFC_RE.fullmatch(str(rfc).upper()):
-        errors.append(f"fiscal.json: rfc '{rfc}' is not a valid RFC (12/13 chars: AAAA999999XXX)")
+        errors.append(f"fiscal data: rfc '{rfc}' is not a valid RFC (12/13 chars: AAAA999999XXX)")
     cp = fiscal.get("cp")
     if cp and not CP_RE.fullmatch(str(cp)):
-        errors.append(f"fiscal.json: cp '{cp}' must be exactly 5 digits")
+        errors.append(f"fiscal data: cp '{cp}' must be exactly 5 digits")
     email = fiscal.get("email")
     if email and not EMAIL_RE.fullmatch(str(email)):
-        errors.append(f"fiscal.json: email '{email}' does not look like an email address")
+        errors.append(f"fiscal data: email '{email}' does not look like an email address")
 
     regimen = fiscal.get("regimen_fiscal")
     if regimen and str(regimen) not in REGIMEN_FISCAL:
-        errors.append(f"fiscal.json: regimen_fiscal '{regimen}' is not in the SAT c_RegimenFiscal catalog")
+        errors.append(f"fiscal data: regimen_fiscal '{regimen}' is not in the SAT c_RegimenFiscal catalog")
     uso = fiscal.get("uso_cfdi")
     if uso and str(uso) not in USO_CFDI:
-        errors.append(f"fiscal.json: uso_cfdi '{uso}' is not in the vendored c_UsoCFDI catalog")
+        errors.append(f"fiscal data: uso_cfdi '{uso}' is not in the vendored c_UsoCFDI catalog")
 
     if regimen and uso and str(regimen) in REGIMEN_FISCAL and str(uso) in USO_CFDI:
         name, compatible = USO_CFDI[str(uso)]
         if str(regimen) not in compatible:
             valid_usos = sorted(code for code, (_, regs) in USO_CFDI.items() if str(regimen) in regs)
             errors.append(
-                f"fiscal.json: uso_cfdi {uso} ({name}) is not SAT-valid for régimen {regimen} "
+                f"fiscal data: uso_cfdi {uso} ({name}) is not SAT-valid for régimen {regimen} "
                 f"({REGIMEN_FISCAL[str(regimen)]}); valid usos for your régimen: {', '.join(valid_usos)}"
             )
     return errors

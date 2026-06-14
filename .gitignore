@@ -46,6 +46,13 @@ Thumbs.db
 
 # CFDI runner artifacts & PII
 runs/
-fiscal.json
+rfcs/
 tickets/
-/ticket.json
+/*ticket*.json
+guides/_drafts/
+
+# Spikes / scratch
+experiments/
+
+# local scratch (chrome profiles, logs, screenshots)
+tmp/
