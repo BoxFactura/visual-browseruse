@@ -41,8 +41,11 @@ Global rules, in priority order:
   option). After selecting, VERIFY the dropdown shows that name; if the only
   available options don't include it, stop and report — do not accept a
   different régimen.
-- For currency- or number-masked fields, use the set_masked_input action with
-  digits only. Never type amounts with decimal points.
+- Amount fields: first type the amount as its decimal value (e.g. 2306.00) and VERIFY the
+  field shows the correct peso amount (e.g. $2,306.00) — NOT the raw digits (230600). If a
+  currency mask mangles it, clear it and re-enter with type_slowly (types each digit with a
+  delay so a keystroke-driven mask formats it, e.g. type "230600"); fall back to
+  set_masked_input only if that still fails. Never accept a wrong amount.
 - Lines starting with "expected:" in the guide describe what the tutorial
   screenshots showed — the live page wins if they disagree.
 - Patience policy for slow SPAs: when a page looks blank, wait the guide's
@@ -100,7 +103,7 @@ def display_value(key: str, value) -> str:
     if key == "regimen_fiscal" and code in REGIMEN_FISCAL:
         return f"{code} - {REGIMEN_FISCAL[code]}"
     if key == "uso_cfdi" and code in USO_CFDI:
-        return f"{code} - {USO_CFDI[code][0]}"
+        return f"{code} - {USO_CFDI[code]}"
     return str(value)
 
 

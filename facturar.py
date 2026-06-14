@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 from cfdi.guides import GuideError, generic_guide, load_guides
 from cfdi.matcher import extract_signals, match
 from cfdi.preflight import get_path, interpret_purchase_date, preflight
+from cfdi.router import route_guide
 from cfdi.runner import (
     STATUS_EXIT_CODES, notify_failure, run_agent, write_hint_draft, write_report,
 )
@@ -89,14 +90,21 @@ def main() -> int:
                   f"{result.candidates}. Resolve with --guide.")
             return STATUS_EXIT_CODES["conflict"]
         if result.status == "no_match":
-            try:
-                guide = generic_guide(ticket)
-            except GuideError as exc:
-                print(f"cannot run: {exc}")
-                return STATUS_EXIT_CODES["no_match"]
-            print(f"no guide for this portal — ADAPTIVE generic mode, starting at "
-                  f"{guide.portal_url}")
-            print("  best-effort final-submit gate; a hint draft is written on success.")
+            # deterministic match missed — let the agent identify the store and pick a guide
+            guide_id = route_guide(ticket, guides, model=args.model)
+            if guide_id:
+                guide = next(g for g in guides if g.id == guide_id)
+                print(f"matched guide: {guide.id} (the agent matched it by store)")
+            else:
+                # no guide for this merchant — go with the ticket's URL if there is one
+                try:
+                    guide = generic_guide(ticket)
+                except GuideError as exc:
+                    print(f"cannot run: {exc}")
+                    return STATUS_EXIT_CODES["no_match"]
+                print(f"no guide for this portal — ADAPTIVE generic mode, starting at "
+                      f"{guide.portal_url}")
+                print("  best-effort final-submit gate; a hint draft is written on success.")
         else:
             guide = next(g for g in guides if g.id == result.guide_id)
             print(f"matched guide: {guide.id} (tier: {result.tier})")

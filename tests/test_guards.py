@@ -35,6 +35,7 @@ def test_registry_safety_surface():
         "reported via ready_for_review instead."
     )
     assert "set_masked_input" in actions
+    assert "type_slowly" in actions
     assert "ready_for_review" in actions
 
     assert_guards(tools)

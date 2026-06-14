@@ -35,20 +35,11 @@ def test_missing_regimen_fiscal_named_exactly():
     ]
 
 
-def test_g03_with_605_rejected_naming_valid_usos():
-    fiscal = GOOD_FISCAL | {"regimen_fiscal": "605"}
-    assert validate_fiscal(fiscal, ALL_FISCAL_FIELDS) == [
-        "fiscal data: uso_cfdi G03 (Gastos en general) is not SAT-valid for régimen 605 "
-        "(Sueldos y Salarios e Ingresos Asimilados a Salarios); valid usos for your régimen: D01, S01"
-    ]
-
-
-def test_g03_with_616_rejected():
-    fiscal = GOOD_FISCAL | {"regimen_fiscal": "616"}
-    assert validate_fiscal(fiscal, ALL_FISCAL_FIELDS) == [
-        "fiscal data: uso_cfdi G03 (Gastos en general) is not SAT-valid for régimen 616 "
-        "(Sin obligaciones fiscales); valid usos for your régimen: S01"
-    ]
+def test_uso_regimen_compatibility_not_pre_validated():
+    # SAT / the portal validate uso↔régimen at stamping; we do NOT pre-block it
+    # locally (a local matrix only risks wrongly rejecting a valid pair).
+    assert validate_fiscal(GOOD_FISCAL | {"regimen_fiscal": "605"}, ALL_FISCAL_FIELDS) == []
+    assert validate_fiscal(GOOD_FISCAL | {"regimen_fiscal": "616"}, ALL_FISCAL_FIELDS) == []
 
 
 def test_g03_with_612_passes():

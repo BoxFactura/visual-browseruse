@@ -33,15 +33,15 @@ REGIMEN_FISCAL = {
     "626": "Régimen Simplificado de Confianza",
 }
 
-# c_UsoCFDI subset (consumer invoicing) → receptor regimens SAT accepts it with.
-# CFDI 4.0 validates this pairing; an incompatible pair fails at stamping time
-# (and portals hide the uso option until a compatible régimen is selected).
+# c_UsoCFDI subset (consumer invoicing): code → name. We do NOT pre-validate
+# uso↔régimen compatibility — CFDI 4.0 / the portal validate it authoritatively
+# at stamping, and a local matrix only risks wrongly blocking a valid pair.
 USO_CFDI = {
-    "G01": ("Adquisición de mercancías", {"601", "603", "606", "612", "620", "621", "622", "623", "624", "625", "626"}),
-    "G02": ("Devoluciones, descuentos o bonificaciones", {"601", "603", "606", "612", "620", "621", "622", "623", "624", "625", "626"}),
-    "G03": ("Gastos en general", {"601", "603", "606", "612", "620", "621", "622", "623", "624", "625", "626"}),
-    "D01": ("Honorarios médicos, dentales y gastos hospitalarios", {"605", "606", "607", "608", "611", "612", "614", "615", "625", "626"}),
-    "S01": ("Sin efectos fiscales", set(REGIMEN_FISCAL)),
+    "G01": "Adquisición de mercancías",
+    "G02": "Devoluciones, descuentos o bonificaciones",
+    "G03": "Gastos en general",
+    "D01": "Honorarios médicos, dentales y gastos hospitalarios",
+    "S01": "Sin efectos fiscales",
 }
 
 RFC_RE = re.compile(r"^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$")
@@ -126,15 +126,6 @@ def validate_fiscal(fiscal: dict, required_fields: tuple[str, ...]) -> list[str]
     uso = fiscal.get("uso_cfdi")
     if uso and str(uso) not in USO_CFDI:
         errors.append(f"fiscal data: uso_cfdi '{uso}' is not in the vendored c_UsoCFDI catalog")
-
-    if regimen and uso and str(regimen) in REGIMEN_FISCAL and str(uso) in USO_CFDI:
-        name, compatible = USO_CFDI[str(uso)]
-        if str(regimen) not in compatible:
-            valid_usos = sorted(code for code, (_, regs) in USO_CFDI.items() if str(regimen) in regs)
-            errors.append(
-                f"fiscal data: uso_cfdi {uso} ({name}) is not SAT-valid for régimen {regimen} "
-                f"({REGIMEN_FISCAL[str(regimen)]}); valid usos for your régimen: {', '.join(valid_usos)}"
-            )
     return errors
 
 

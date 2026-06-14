@@ -59,7 +59,7 @@ def test_real_amorino_guide_ticket_field_map():
         ("purchase_date", "invoice.date"),
         ("total", "summary.total"),
     )
-    assert guide.required_ticket_fields == ("invoice.invoice_number", "summary.total")
+    assert guide.required_ticket_fields == ()  # leaned: agent reads the ticket, no hard-required fields
     assert guide.stop_before_labels == ("GENERAR FACTURA",)
 
 

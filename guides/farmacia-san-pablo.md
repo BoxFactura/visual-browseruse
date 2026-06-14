@@ -5,7 +5,6 @@ match:
   domains: [farmaciasanpablo.com.mx]
   rfcs: [PPL961114GZ1]
 portal_url: https://emision-sanpablo-portal-auto-prod.pegasotecnologia.mx/
-required_ticket_fields: [invoice_data.facturacion_folio, purchase.total, purchase.date]
 required_fiscal_fields: [rfc, nombre, cp, regimen_fiscal, uso_cfdi, email]
 invoicing_window: { max_days_after_purchase: 180 }
 stop:
@@ -23,11 +22,16 @@ last_verified: 2026-06-14
    apply the patience policy — this SPA renders slowly; blank does NOT mean down. If a
    landing page or menu shows instead, find the option to facturar a purchase ticket.
 2. Close any promo popup (X button) if one appears.
-3. Fill "Folio" with {facturacion_folio}.
-   verify: the field shows all 21 digits.
-4. Fill "Total" using the set_masked_input action with digits only (e.g. "47400" for $474.00).
-   The Total field has a CURRENCY MASK — never type a decimal point, it mangles the value.
-   verify: the field visually reads exactly the ticket total (e.g. "$474.00") before continuing.
+3. Fill "Folio" with the ticket's invoicing folio ("folio para facturación" / invoice
+   folio — a short number like 2093278283), NOT the long reference number, order number,
+   or barcode. If the ticket has several id-looking fields, pick the invoice/facturación
+   folio.
+   verify: the folio field holds that invoicing folio.
+4. Fill "Total". The field has a badly-implemented currency mask, so use type_slowly to
+   type the amount's digits one key at a time (e.g. "230600" for $2,306.00) — the mask
+   builds the formatted amount as the keys arrive.
+   verify: the field reads the correct peso amount (e.g. "$2,306.00"), not the raw digits;
+   if it still shows raw digits, retry type_slowly with a larger delay before continuing.
 5. Click "Obtener Factura".
    If an alert says "No se encontró el recibo": re-verify folio and total once; if it
    repeats, abort — the ticket data is wrong.

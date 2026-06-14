@@ -15,6 +15,7 @@ Pinned to browser-use==0.12.9 — the guard delegates to Tools._click_by_index
 to keep all built-in click behavior (new-tab detection, <select> handling).
 """
 
+import asyncio
 import json
 import unicodedata
 
@@ -132,6 +133,51 @@ def build_tools(stop_labels: tuple[str, ...], *, auto_submit: bool = False) -> T
             return ActionResult(error=f"set_masked_input failed: {js_result['exceptionDetails']}")
         value = js_result.get("result", {}).get("value", "")
         memory = f"set_masked_input({digits!r}) on element {index}; field now reads {value!r}"
+        return ActionResult(extracted_content=memory, long_term_memory=memory)
+
+    @tools.action(
+        "Type into a field one real keystroke at a time, with a delay between keys, so a "
+        "badly-implemented input mask processes each keypress. Use this for currency/number "
+        "masks that mangle a set value (e.g. type the digits '230600' and the mask builds "
+        "'$2,306.00'). index = the field; text = exactly the characters to type; delay_ms "
+        "between keystrokes (default 90)."
+    )
+    async def type_slowly(index: int, text: str, browser_session: BrowserSession, delay_ms: int = 90):
+        node = await browser_session.get_element_by_index(index)
+        if node is None:
+            return ActionResult(error=f"Element index {index} not available - refresh browser state.")
+        cdp = await browser_session.get_or_create_cdp_session()
+        resolved = await cdp.cdp_client.send.DOM.resolveNode(
+            params={"backendNodeId": node.backend_node_id}, session_id=cdp.session_id,
+        )
+        obj = resolved.get("object", {}).get("objectId")
+        if not obj:
+            return ActionResult(error=f"Could not resolve element {index} to a DOM object.")
+        # focus and clear the field first
+        await cdp.cdp_client.send.Runtime.callFunctionOn(
+            params={"objectId": obj, "functionDeclaration":
+                    "function(){this.focus();const p=this.tagName==='TEXTAREA'?"
+                    "HTMLTextAreaElement.prototype:HTMLInputElement.prototype;"
+                    "Object.getOwnPropertyDescriptor(p,'value').set.call(this,'');"
+                    "this.dispatchEvent(new Event('input',{bubbles:true}));}"},
+            session_id=cdp.session_id,
+        )
+        for ch in text:
+            await cdp.cdp_client.send.Input.dispatchKeyEvent(
+                params={"type": "keyDown", "key": ch}, session_id=cdp.session_id)
+            await cdp.cdp_client.send.Input.dispatchKeyEvent(
+                params={"type": "char", "text": ch, "key": ch}, session_id=cdp.session_id)
+            await cdp.cdp_client.send.Input.dispatchKeyEvent(
+                params={"type": "keyUp", "key": ch}, session_id=cdp.session_id)
+            await asyncio.sleep(max(0, delay_ms) / 1000)
+        result = await cdp.cdp_client.send.Runtime.callFunctionOn(
+            params={"objectId": obj, "returnByValue": True, "functionDeclaration":
+                    "function(){this.dispatchEvent(new Event('change',{bubbles:true}));"
+                    "this.blur();return this.value;}"},
+            session_id=cdp.session_id,
+        )
+        value = result.get("result", {}).get("value", "")
+        memory = f"type_slowly({text!r}) into element {index}; field now reads {value!r}"
         return ActionResult(extracted_content=memory, long_term_memory=memory)
 
     # NOTE: params must be strict-JSON-schema friendly — OpenAI's structured
