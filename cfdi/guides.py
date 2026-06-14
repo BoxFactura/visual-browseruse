@@ -12,17 +12,12 @@ from pathlib import Path
 
 import yaml
 
-REQUIRED_KEYS = [
-    "id",
-    "description",
-    "match",
-    "portal_url",
-    "required_ticket_fields",
-    "required_fiscal_fields",
-    "stop",
-    "patience",
-    "last_verified",
-]
+# A guide can be just a few hints: only the essentials are required; the rest
+# default so a new guide is id + description + match + portal_url + stop + body.
+REQUIRED_KEYS = ["id", "description", "match", "portal_url", "stop"]
+
+# Universal receptor bundle — the default required_fiscal_fields for any guide.
+DEFAULT_FISCAL_FIELDS = ("rfc", "nombre", "cp", "regimen_fiscal", "uso_cfdi", "email")
 
 # chars/4 ≈ tokens; real tokenizer arrives with the phase-2 compiler
 BODY_BUDGET_CHARS = 20_000
@@ -232,7 +227,7 @@ def parse_guide(path: Path, allow_review_placeholder: bool = False) -> Guide:
         )
 
     window = fm.get("invoicing_window") or {}
-    patience = fm["patience"]
+    patience = fm.get("patience") or {}
 
     field_map = dict(DEFAULT_TICKET_FIELD_MAP)
     overrides = fm.get("ticket_field_map") or {}
@@ -250,14 +245,14 @@ def parse_guide(path: Path, allow_review_placeholder: bool = False) -> Guide:
         domains=domains,
         rfcs=rfcs,
         portal_url=str(fm["portal_url"]),
-        required_ticket_fields=tuple(fm["required_ticket_fields"]),
-        required_fiscal_fields=tuple(fm["required_fiscal_fields"]),
+        required_ticket_fields=tuple(fm.get("required_ticket_fields") or ()),
+        required_fiscal_fields=tuple(fm.get("required_fiscal_fields") or DEFAULT_FISCAL_FIELDS),
         invoicing_window_days=window.get("max_days_after_purchase"),
         ticket_field_map=tuple(sorted(field_map.items())),
         stop_before_labels=labels,
-        patience_max_reload_cycles=int(patience["max_reload_cycles"]),
-        patience_wait_seconds=int(patience["wait_seconds"]),
-        last_verified=str(fm["last_verified"]),
+        patience_max_reload_cycles=int(patience.get("max_reload_cycles", 3)),
+        patience_wait_seconds=int(patience.get("wait_seconds", 10)),
+        last_verified=str(fm.get("last_verified", "never")),
         body=body.strip(),
         path=path,
     )
