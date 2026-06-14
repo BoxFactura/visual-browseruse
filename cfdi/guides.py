@@ -81,7 +81,7 @@ read the screen and adapt.
 | symptom | workaround |
 |---|---|
 | typed value doubles or won't stick (React/Vue input) | set the value once via the native setter + input/change events; don't retype char-by-char |
-| amount field is currency-masked ("$474.00" mangled) | type digits only |
+| amount field is currency-masked / mangled | use type_slowly with the exact value (e.g. "2306.00"), then verify |
 | custom dropdown won't accept a typed value | click it to open, then click the option by its visible name |
 | page blank after navigation | slow SPA: wait, reload, up to the patience limit; never declare it down first |
 

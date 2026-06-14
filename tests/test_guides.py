@@ -42,7 +42,7 @@ def test_parse_real_san_pablo_guide():
     assert guide.stop_before_labels == ("Emitir Factura", "Generar Factura y Enviar")
     assert guide.invoicing_window_days == 180
     assert guide.patience_max_reload_cycles == 3
-    assert "set_masked_input" in guide.body
+    assert "type_slowly" in guide.body
     assert "CFDI40147" in guide.body
     assert "NEVER click it" in guide.body
 

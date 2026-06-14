@@ -27,11 +27,10 @@ last_verified: 2026-06-14
    or barcode. If the ticket has several id-looking fields, pick the invoice/facturación
    folio.
    verify: the folio field holds that invoicing folio.
-4. Fill "Total". The field has a badly-implemented currency mask, so use type_slowly to
-   type the amount's digits one key at a time (e.g. "230600" for $2,306.00) — the mask
-   builds the formatted amount as the keys arrive.
-   verify: the field reads the correct peso amount (e.g. "$2,306.00"), not the raw digits;
-   if it still shows raw digits, retry type_slowly with a larger delay before continuing.
+4. Fill "Total" with type_slowly, typing the EXACT amount including decimals (e.g. "2306.00").
+   It types real keys with a delay and blurs, so the badly-implemented mask formats it.
+   verify: the field shows the amount (e.g. "2306.00" / "$2,306.00"), NOT raw digits like
+   230600; if it's wrong, retry type_slowly with a larger delay before continuing.
 5. Click "Obtener Factura".
    If an alert says "No se encontró el recibo": re-verify folio and total once; if it
    repeats, abort — the ticket data is wrong.
@@ -50,7 +49,7 @@ last_verified: 2026-06-14
 ## Quirks
 | symptom | workaround |
 |---|---|
-| Total shows "$74.00" or "$74,474.00" after typing | use set_masked_input with digits only; never retype decimals |
+| Total mask mangles the amount | type it with type_slowly (real keys + blur), the exact value e.g. "2306.00"; then verify |
 | page blank for >10s | patience policy: wait, reload, max cycles per policy — never declare the site down before exhausting them |
 | promo popup blocks the page | close it via its X before anything else |
 | receptor fields blank / CP disabled | enter RFC, then click "Buscar cliente" — it autofills nombre/CP/régimen; verify them, don't hand-type over them |

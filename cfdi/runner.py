@@ -41,11 +41,10 @@ Global rules, in priority order:
   option). After selecting, VERIFY the dropdown shows that name; if the only
   available options don't include it, stop and report — do not accept a
   different régimen.
-- Amount fields: first type the amount as its decimal value (e.g. 2306.00) and VERIFY the
-  field shows the correct peso amount (e.g. $2,306.00) — NOT the raw digits (230600). If a
-  currency mask mangles it, clear it and re-enter with type_slowly (types each digit with a
-  delay so a keystroke-driven mask formats it, e.g. type "230600"); fall back to
-  set_masked_input only if that still fails. Never accept a wrong amount.
+- Amount fields: enter them with type_slowly using the EXACT decimal value (e.g. type
+  "2306.00") — type_slowly types real keystrokes with a delay and blurs, so a masked field
+  formats correctly. Then VERIFY the field shows that amount (e.g. $2,306.00), NEVER the raw
+  digits like 230600. If it's still wrong, retry type_slowly with a larger delay.
 - Lines starting with "expected:" in the guide describe what the tutorial
   screenshots showed — the live page wins if they disagree.
 - Patience policy for slow SPAs: when a page looks blank, wait the guide's

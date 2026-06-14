@@ -91,7 +91,7 @@ def test_write_report_uses_guide_field_map(tmp_path):
 
 def test_policy_is_stable_and_mentions_the_three_mechanisms():
     assert "ready_for_review" in POLICY
-    assert "set_masked_input" in POLICY
+    assert "type_slowly" in POLICY
     assert "expected:" in POLICY
 
 
@@ -119,7 +119,7 @@ def test_auto_submit_task_and_policy():
 
     assert "confirm_emission" in POLICY_AUTO
     assert "NEVER click a final submit button" not in POLICY_AUTO
-    assert "set_masked_input" in POLICY_AUTO
+    assert "type_slowly" in POLICY_AUTO
 
 
 def test_auto_submit_strips_only_the_stop_section():

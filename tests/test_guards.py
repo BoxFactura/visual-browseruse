@@ -34,8 +34,8 @@ def test_registry_safety_surface():
         "Click element by index. Final-submit buttons are blocked and must be "
         "reported via ready_for_review instead."
     )
-    assert "set_masked_input" in actions
     assert "type_slowly" in actions
+    assert "set_masked_input" not in actions  # removed: confused the agent into raw digits
     assert "ready_for_review" in actions
 
     assert_guards(tools)
@@ -46,8 +46,8 @@ def test_custom_action_params_are_strict_schema_compatible():
     action params — every property must be an enumerated type. Regression test
     for the run that failed 6/6 steps with 'Invalid schema for response_format'."""
     cases = [
-        (build_tools(STOP), ("ready_for_review", "set_masked_input")),
-        (build_tools(STOP, auto_submit=True), ("confirm_emission", "set_masked_input")),
+        (build_tools(STOP), ("ready_for_review", "type_slowly")),
+        (build_tools(STOP, auto_submit=True), ("confirm_emission", "type_slowly")),
     ]
     for tools, names in cases:
         actions = tools.registry.registry.actions

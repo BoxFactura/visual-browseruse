@@ -6,7 +6,7 @@ Three properties enforced here, mechanically rather than by prompt:
    dict assignment, no collision guard) by a guard that refuses elements
    matching the guide's stop labels, and the run ends via `ready_for_review`.
 2. The agent has no raw-JS or keyboard escape hatch in either mode: `evaluate`
-   and `send_keys` are excluded; `set_masked_input` is the one bounded helper.
+   and `send_keys` are excluded; `type_slowly` is the bounded typing helper.
 3. Auto-submit mode (explicit --auto-submit): the deny-list is emptied and the
    run ends via `confirm_emission` after the portal confirms emission; the
    judge must agree or the run reports judge_failed, not submitted.
@@ -51,23 +51,6 @@ def matched_stop_label(texts: list[str], stop_labels: tuple[str, ...]) -> str | 
     return None
 
 
-SET_MASKED_INPUT_JS = """
-function(digits) {
-    const proto = this instanceof HTMLTextAreaElement
-        ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
-    const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
-    this.focus();
-    setter.call(this, '');
-    this.dispatchEvent(new Event('input', {bubbles: true}));
-    setter.call(this, digits);
-    this.dispatchEvent(new Event('input', {bubbles: true}));
-    this.dispatchEvent(new Event('change', {bubbles: true}));
-    this.blur();
-    return this.value;
-}
-"""
-
-
 def build_tools(stop_labels: tuple[str, ...], *, auto_submit: bool = False) -> Tools:
     """Supervised mode (default): final-submit clicks are refused and the run
     ends via ready_for_review. auto_submit=True: the built-in click stays (no
@@ -101,46 +84,12 @@ def build_tools(stop_labels: tuple[str, ...], *, auto_submit: bool = False) -> T
             return await tools._click_by_index(params, browser_session)
 
     @tools.action(
-        "Set a currency/number-masked input reliably. Pass the element index and the "
-        "DIGITS ONLY (no decimal point, no symbols: '47400' for $474.00). Typing into "
-        "masked fields mangles values; this sets the value and fires the mask's events. "
-        "Returns the field's resulting visible value — verify it before submitting."
-    )
-    async def set_masked_input(index: int, digits: str, browser_session: BrowserSession):
-        if not digits.isdigit():
-            return ActionResult(error=f"set_masked_input takes digits only, got {digits!r}")
-        node = await browser_session.get_element_by_index(index)
-        if node is None:
-            return ActionResult(error=f"Element index {index} not available - refresh browser state.")
-
-        cdp_session = await browser_session.get_or_create_cdp_session()
-        resolved = await cdp_session.cdp_client.send.DOM.resolveNode(
-            params={"backendNodeId": node.backend_node_id},
-            session_id=cdp_session.session_id,
-        )
-        if "object" not in resolved or "objectId" not in resolved["object"]:
-            return ActionResult(error=f"Could not resolve element {index} to a DOM object.")
-        js_result = await cdp_session.cdp_client.send.Runtime.callFunctionOn(
-            params={
-                "objectId": resolved["object"]["objectId"],
-                "functionDeclaration": SET_MASKED_INPUT_JS,
-                "arguments": [{"value": digits}],
-                "returnByValue": True,
-            },
-            session_id=cdp_session.session_id,
-        )
-        if js_result.get("exceptionDetails"):
-            return ActionResult(error=f"set_masked_input failed: {js_result['exceptionDetails']}")
-        value = js_result.get("result", {}).get("value", "")
-        memory = f"set_masked_input({digits!r}) on element {index}; field now reads {value!r}"
-        return ActionResult(extracted_content=memory, long_term_memory=memory)
-
-    @tools.action(
-        "Type into a field one real keystroke at a time, with a delay between keys, so a "
-        "badly-implemented input mask processes each keypress. Use this for currency/number "
-        "masks that mangle a set value (e.g. type the digits '230600' and the mask builds "
-        "'$2,306.00'). index = the field; text = exactly the characters to type; delay_ms "
-        "between keystrokes (default 90)."
+        "Type text into a field one real keystroke at a time with a delay between keys, "
+        "then blur. The right way to fill a finicky/masked input (e.g. a currency field): "
+        "real keystrokes let the mask format as you type. Pass the EXACT text the field "
+        "should hold (e.g. '2306.00' for a total — the literal amount, NOT raw digits). "
+        "index = the field; text = the exact characters; delay_ms between keystrokes "
+        "(default 90). Returns the field's resulting value — verify it before continuing."
     )
     async def type_slowly(index: int, text: str, browser_session: BrowserSession, delay_ms: int = 90):
         node = await browser_session.get_element_by_index(index)
@@ -256,4 +205,4 @@ def assert_guards(tools: Tools, *, auto_submit: bool = False) -> None:
         "coordinate clicking is enabled — it bypasses the index-based click guard"
     )
     done_action = "confirm_emission" if auto_submit else "ready_for_review"
-    assert done_action in actions and "set_masked_input" in actions
+    assert done_action in actions and "type_slowly" in actions
