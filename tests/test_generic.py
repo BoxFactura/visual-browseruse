@@ -39,13 +39,26 @@ def test_generic_guide_normalizes_scheme_less_url():
     assert g.id == "generic-tienda-nueva-com-mx"
 
 
-def test_generic_guide_requires_a_starting_url():
+def test_generic_guide_requires_a_url_or_store_name():
+    # neither an invoicing URL nor a facturadata.store_name → nothing to start from
     with pytest.raises(GuideError) as exc:
         generic_guide({"issuer": {"rfc": "XXX010101000"}, "additional_info": {}})
     assert str(exc.value) == (
-        "no guide for this portal and no invoicing URL found in the ticket "
-        "— add a guide or a starting URL"
+        "no guide for this portal, no invoicing URL in the ticket, and no "
+        "facturadata.store_name to search — add a guide or a starting URL"
     )
+
+
+def test_generic_guide_searches_when_no_url_but_store_name():
+    # no URL anywhere, but facturadata names the store → start on a web search and
+    # let the agent find the merchant's official portal
+    g = generic_guide({"facturadata": {"store_name": "Bodegas Alianza"}, "totals": {"total": 104.5}})
+    assert g.is_generic is True
+    assert g.id == "generic-bodegas-alianza"
+    assert g.portal_url == "https://www.google.com/search?q=Bodegas+Alianza+facturaci%C3%B3n+CFDI"
+    assert g.stop_before_labels == GENERIC_STOP_LABELS
+    assert "start on a web search" in g.body
+    assert "prefer the merchant's own domain" in g.body
 
 
 # Real "Tiendas Extra" ticket shape: URL at facturacion.url, not the assumed key.

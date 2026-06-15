@@ -65,15 +65,30 @@ class Guide:
 
 # Portable hints that apply to ~any Mexican CFDI portal — the distilled
 # cross-portal knowledge an unknown-portal run starts from (no per-site steps).
-GENERIC_HINTS_BODY = """\
+# Step 1 (how to reach the portal) varies: start at the ticket's URL, or — when the
+# ticket has none — search the web for the merchant's portal and find it.
+_GENERIC_INTRO = """\
 ## Unknown portal — adapt to the live page
 There is no portal-specific guide yet. These are general hints, not a script:
 read the screen and adapt.
 
 ## Approach
+"""
+
+_START_FROM_URL = """\
 1. You start at the ticket's invoicing URL. If it is a marketing homepage, find the
    "Facturación" / "Factura" / "Facturar" entry and open it. A blank page is usually a
-   slow SPA — wait and reload (see patience limits) before concluding it is down.
+   slow SPA — wait and reload (see patience limits) before concluding it is down."""
+
+_START_FROM_SEARCH = """\
+1. The ticket has no invoicing URL, so you start on a web search for this merchant's
+   invoicing portal. Identify and open the MERCHANT'S OWN official "Facturación
+   electrónica" / "Factura" / "CFDI" page — prefer the merchant's own domain over the
+   many third-party facturación aggregators that invoice for lots of stores. If no result
+   is clearly the official one, refine the search; do not guess a random aggregator. A
+   blank page is usually a slow SPA — wait and reload before concluding it is down."""
+
+_GENERIC_REST = """\
 2. Forms are usually 1-3 steps: ticket lookup (número/folio; sometimes total and date),
    then receptor fiscal data, then an emit button. Fill only the fields THIS portal shows
    from the data below — portals ask for a SUBSET. Never invent a value you were not given.
@@ -106,6 +121,9 @@ First encounter with this portal — a human verifies. NEVER click a final emit 
 When the form is filled and only that button remains, call ready_for_review with the
 EXACT label of that button — that is what teaches the portal's real stop label."""
 
+GENERIC_HINTS_BODY = _GENERIC_INTRO + _START_FROM_URL + "\n" + _GENERIC_REST
+GENERIC_SEARCH_HINTS_BODY = _GENERIC_INTRO + _START_FROM_SEARCH + "\n" + _GENERIC_REST
+
 # High-confidence final-emit verbs the click-guard blocks by default — for unknown
 # portals AND any guide that doesn't declare its own stop.before_labels. The agent
 # is told to recognize the final-submit button itself (its policy); this is the
@@ -123,6 +141,17 @@ def _host_slug(url: str) -> str:
     from urllib.parse import urlparse
     host = (urlparse(url).hostname or "").removeprefix("www.")
     return host.replace(".", "-") or "unknown-portal"
+
+
+def _store_slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.casefold()).strip("-") or "unknown-merchant"
+
+
+def facturacion_search_url(store_name: str) -> str:
+    """A web-search starting point for a merchant's self-invoicing portal, used
+    when the ticket names the store but carries no invoicing URL."""
+    from urllib.parse import quote_plus
+    return "https://www.google.com/search?q=" + quote_plus(f"{store_name} facturación CFDI")
 
 
 _URL_HINT_WORDS = ("factura", "invoice", "cfdi", "portal")
@@ -171,22 +200,32 @@ def find_invoice_url(ticket: dict) -> str | None:
 def generic_guide(ticket: dict) -> Guide:
     """Synthesize an adaptive hint-guide for a portal we have no guide for.
 
-    Raises GuideError if the ticket carries no invoicing URL to start from.
+    Starts at the ticket's invoicing URL when it has one. Otherwise, if the
+    ticket's facturadata names the store, starts on a web search for that store's
+    facturación portal and lets the agent find it — no portal is known up front,
+    but the merchant is. Raises GuideError only when there's neither a URL nor a
+    store name to go on.
     """
     invoice_url = find_invoice_url(ticket)
-    if not invoice_url:
+    store_name = str((ticket.get("facturadata") or {}).get("store_name") or "").strip()
+    if invoice_url:
+        portal_url, body, slug = invoice_url, GENERIC_HINTS_BODY, _host_slug(invoice_url)
+    elif store_name:
+        portal_url = facturacion_search_url(store_name)
+        body, slug = GENERIC_SEARCH_HINTS_BODY, _store_slug(store_name)
+    else:
         raise GuideError(
-            "no guide for this portal and no invoicing URL found in the ticket "
-            "— add a guide or a starting URL"
+            "no guide for this portal, no invoicing URL in the ticket, and no "
+            "facturadata.store_name to search — add a guide or a starting URL"
         )
 
     return Guide(
-        id=f"generic-{_host_slug(invoice_url)}",
+        id=f"generic-{slug}",
         description="Adaptive hint-guide for an unknown CFDI portal (no specific guide yet).",
         domains=(),
         rfcs=(),
         names=(),
-        portal_url=invoice_url,
+        portal_url=portal_url,
         required_ticket_fields=(),  # adapt to whatever the portal asks
         required_fiscal_fields=("rfc", "nombre", "cp", "regimen_fiscal", "uso_cfdi", "email"),
         invoicing_window_days=None,
@@ -195,7 +234,7 @@ def generic_guide(ticket: dict) -> Guide:
         patience_max_reload_cycles=3,
         patience_wait_seconds=10,
         last_verified="never",
-        body=GENERIC_HINTS_BODY,
+        body=body,
         path=Path("<generic>"),
         is_generic=True,
     )
