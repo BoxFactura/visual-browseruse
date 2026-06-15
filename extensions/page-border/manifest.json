@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "CFDI Run Marker",
+  "version": "1.0.0",
+  "description": "Visual marker for automated invoicing runs: draws a 10px solid black border around every page's body.",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["border.css"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

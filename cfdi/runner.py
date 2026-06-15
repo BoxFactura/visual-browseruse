@@ -81,6 +81,28 @@ def _strip_supervised_stop(body: str) -> str:
 
 PROFILES_DIR = "~/.config/browseruse/profiles"
 
+# Unpacked MV3 extension that draws a 10px black border on every page body — a
+# visual marker that you're looking at the automated browser, not a normal one.
+PAGE_MARKER_EXTENSION = Path(__file__).resolve().parent.parent / "extensions" / "page-border"
+
+
+def _extension_args() -> list[str]:
+    """Chrome args that load ONLY our page-marker extension.
+
+    We own the extension args wholesale instead of adding to browser-use's
+    bundled set: BrowserSession rebuilds the BrowserProfile from kwargs (so a
+    profile subclass override wouldn't survive), and its own --load-extension is
+    appended after ours and would win the launch-time arg dedup — dropping ours.
+    So we disable the default extensions (see enable_default_extensions=False)
+    and supply the single --load-extension here. Chrome needs an absolute path.
+    """
+    ext = str(PAGE_MARKER_EXTENSION)
+    return [
+        "--enable-extensions",
+        f"--disable-extensions-except={ext}",
+        f"--load-extension={ext}",
+    ]
+
 STATUS_EXIT_CODES = {
     "ready_for_review": 0,
     "submitted": 0,
@@ -185,6 +207,8 @@ def run_agent(guide: Guide, ticket: dict, fiscal: dict, *, headless: bool, model
         user_data_dir=f"{PROFILES_DIR}/{guide.id}",
         minimum_wait_page_load_time=3.0,
         wait_for_network_idle_page_load_time=6.0,
+        enable_default_extensions=False,
+        args=_extension_args(),
     )
     tools = build_tools(guide.stop_before_labels, auto_submit=auto_submit)
     fallback = os.getenv("INVOICE_FALLBACK_MODEL", "gpt-5.4-mini")
