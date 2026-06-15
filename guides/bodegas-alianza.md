@@ -16,8 +16,10 @@ last_verified: never
   ticket — read it and find the value that MEANS each one (a short letter/number series, the
   ticket/folio number, and a separate billing/facturación code), then enter each into its
   matching field and look up the ticket.
-- Then choose "Completar mis datos" and fill the receptor fiscal data: RFC {rfc}, nombre
-  {nombre}, CP {cp}, régimen {regimen_fiscal}, uso de CFDI {uso_cfdi}, email {email}.
+- After the ticket is found, the "Convertir a Factura" button is DISABLED. Click "Completar
+  mis datos" to open the receptor fiscal-data form, then fill it: RFC {rfc}, nombre {nombre},
+  CP {cp}, régimen {regimen_fiscal}, uso de CFDI {uso_cfdi}, email {email}. Completing your
+  data is what ENABLES "Convertir a Factura".
 - The total and purchase date the portal shows for the looked-up ticket should match the
   ticket — verify them, don't invent. The final step converts the ticket to an invoice and
   emails the XML/PDF.
