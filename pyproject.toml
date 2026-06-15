@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "browser-use==0.12.9",
+    "browser-use==0.13.1",
     "pyyaml>=6.0.3",
     "tldextract>=5.3.1",
 ]

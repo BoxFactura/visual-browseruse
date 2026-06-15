@@ -11,7 +11,7 @@ Three properties enforced here, mechanically rather than by prompt:
    run ends via `confirm_emission` after the portal confirms emission; the
    judge must agree or the run reports judge_failed, not submitted.
 
-Pinned to browser-use==0.12.9 — the guard delegates to Tools._click_by_index
+Pinned to browser-use==0.13.1 — the guard delegates to Tools._click_by_index
 to keep all built-in click behavior (new-tab detection, <select> handling).
 """
 
