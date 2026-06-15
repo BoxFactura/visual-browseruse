@@ -1,16 +1,20 @@
 """Ticket → guide matching. Deterministic tiers, never silently picks on conflict.
 
-Tier 1: portal domain from the ticket's invoice_url (eTLD+1 via public-suffix
-parsing — naive "last two labels" breaks on .com.mx). Tier 2: issuer RFC,
-exact. Cross-tier disagreement is a conflict naming both candidates: on a
-fiscal flow the wrong guide is worse than no guide.
+The ticket's top-level `facturadata` block is the standardized matching input:
+its `store_name` (matched against a guide's match.names) and optional `rfc`
+(against match.rfcs). We also derive a portal domain from any invoice_url in the
+ticket (eTLD+1 via public-suffix parsing — naive "last two labels" breaks on
+.com.mx) and fall back to issuer.rfc when facturadata carries no rfc. When more
+than one signal hits different guides it's a conflict naming every candidate: on
+a fiscal flow the wrong guide is worse than no guide. Everything missing → the
+caller falls back to the LLM router, then the ticket's own URL.
 """
 
 from dataclasses import dataclass
 
 import tldextract
 
-from cfdi.guides import Guide, find_invoice_url
+from cfdi.guides import Guide, find_invoice_url, normalize_store_name
 
 # Offline: empty suffix_list_urls uses the bundled PSL snapshot, no network fetch.
 _extract = tldextract.TLDExtract(suffix_list_urls=())
@@ -20,6 +24,7 @@ _extract = tldextract.TLDExtract(suffix_list_urls=())
 class Signals:
     domain: str | None
     rfc: str | None
+    store_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -41,25 +46,36 @@ def normalize_domain(url: str) -> str | None:
 
 
 def extract_signals(ticket: dict) -> Signals:
+    facturadata = ticket.get("facturadata") or {}
+    store_name = normalize_store_name(facturadata.get("store_name") or "") or None
+    rfc = facturadata.get("rfc") or (ticket.get("issuer") or {}).get("rfc") or None
     invoice_url = find_invoice_url(ticket) or ""
-    rfc = (ticket.get("issuer") or {}).get("rfc") or None
     return Signals(
         domain=normalize_domain(invoice_url),
         rfc=rfc.strip().upper() if rfc else None,
+        store_name=store_name,
     )
 
 
 def match(signals: Signals, guides: list[Guide]) -> MatchResult:
     by_domain = {d: g for g in guides for d in g.domains}
     by_rfc = {r: g for g in guides for r in g.rfcs}
+    by_name = {n: g for g in guides for n in g.names}
 
-    domain_hit = by_domain.get(signals.domain) if signals.domain else None
-    rfc_hit = by_rfc.get(signals.rfc) if signals.rfc else None
+    # Collect every signal that hits a guide, most-precise first (RFC is an exact
+    # fiscal id, store name a canonical label, domain an incidental URL host).
+    hits: list[tuple[str, Guide]] = []
+    if signals.rfc and signals.rfc in by_rfc:
+        hits.append(("rfc", by_rfc[signals.rfc]))
+    if signals.store_name and signals.store_name in by_name:
+        hits.append(("name", by_name[signals.store_name]))
+    if signals.domain and signals.domain in by_domain:
+        hits.append(("domain", by_domain[signals.domain]))
 
-    if domain_hit and rfc_hit and domain_hit.id != rfc_hit.id:
-        return MatchResult(status="conflict", candidates=(domain_hit.id, rfc_hit.id))
-    if domain_hit:
-        return MatchResult(status="matched", guide_id=domain_hit.id, tier="domain")
-    if rfc_hit:
-        return MatchResult(status="matched", guide_id=rfc_hit.id, tier="rfc")
+    candidates = tuple(sorted({g.id for _, g in hits}))
+    if len(candidates) > 1:
+        return MatchResult(status="conflict", candidates=candidates)
+    if hits:
+        tier, guide = hits[0]
+        return MatchResult(status="matched", guide_id=guide.id, tier=tier)
     return MatchResult(status="no_match")

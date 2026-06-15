@@ -31,6 +31,13 @@ DEFAULT_TICKET_FIELD_MAP = {
 }
 
 
+def normalize_store_name(name: str) -> str:
+    """Casefold + collapse whitespace so a ticket's facturadata.store_name and a
+    guide's declared match.names compare reliably ('Bodegas  Alianza' →
+    'bodegas alianza'). Empty / whitespace-only → ''."""
+    return " ".join(str(name).split()).casefold()
+
+
 class GuideError(ValueError):
     pass
 
@@ -41,6 +48,7 @@ class Guide:
     description: str
     domains: tuple[str, ...]
     rfcs: tuple[str, ...]
+    names: tuple[str, ...]  # normalized store names (match against facturadata.store_name)
     portal_url: str
     required_ticket_fields: tuple[str, ...]
     required_fiscal_fields: tuple[str, ...]
@@ -177,6 +185,7 @@ def generic_guide(ticket: dict) -> Guide:
         description="Adaptive hint-guide for an unknown CFDI portal (no specific guide yet).",
         domains=(),
         rfcs=(),
+        names=(),
         portal_url=invoice_url,
         required_ticket_fields=(),  # adapt to whatever the portal asks
         required_fiscal_fields=("rfc", "nombre", "cp", "regimen_fiscal", "uso_cfdi", "email"),
@@ -212,8 +221,9 @@ def parse_guide(path: Path, allow_review_placeholder: bool = False) -> Guide:
     match = fm["match"]
     domains = tuple(str(d).lower() for d in match.get("domains", []))
     rfcs = tuple(str(r).upper() for r in match.get("rfcs", []))
-    if not domains and not rfcs:
-        raise GuideError(f"{path.name}: match must declare at least one domain or rfc")
+    names = tuple(n for n in (normalize_store_name(x) for x in match.get("names", [])) if n)
+    if not domains and not rfcs and not names:
+        raise GuideError(f"{path.name}: match must declare at least one domain, rfc, or name")
     for d in domains:
         if "/" in d or d.startswith("www."):
             raise GuideError(f"{path.name}: match.domains entries must be bare eTLD+1, got {d!r}")
@@ -246,6 +256,7 @@ def parse_guide(path: Path, allow_review_placeholder: bool = False) -> Guide:
         description=str(fm["description"]),
         domains=domains,
         rfcs=rfcs,
+        names=names,
         portal_url=str(fm["portal_url"]),
         required_ticket_fields=tuple(fm.get("required_ticket_fields") or ()),
         required_fiscal_fields=tuple(fm.get("required_fiscal_fields") or DEFAULT_FISCAL_FIELDS),
@@ -267,7 +278,7 @@ def load_guides(guides_dir: Path) -> list[Guide]:
     claims: dict[tuple[str, str], str] = {}
     problems: list[str] = []
     for g in guides:
-        for kind, keys in (("domain", g.domains), ("rfc", g.rfcs)):
+        for kind, keys in (("domain", g.domains), ("rfc", g.rfcs), ("name", g.names)):
             for key in keys:
                 prior = claims.setdefault((kind, key), g.id)
                 if prior != g.id:

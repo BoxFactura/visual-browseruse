@@ -15,6 +15,7 @@ def test_parse_fixture_guide_full_object():
         description="CFDI invoicing for Los Pollos Hermanos restaurant tickets.",
         domains=("lospolloshermanos.com.mx",),
         rfcs=("PHE850315GH7",),
+        names=(),
         portal_url="https://factura.lospolloshermanos.com.mx/",
         required_ticket_fields=("invoice_data.facturacion_folio", "purchase.total"),
         required_fiscal_fields=("rfc", "nombre", "cp", "regimen_fiscal", "uso_cfdi", "email"),
@@ -50,6 +51,50 @@ def test_parse_real_san_pablo_guide():
 def test_load_guides_returns_both_fixtures():
     guides = load_guides(FIXTURES / "guides")
     assert [g.id for g in guides] == ["los-pollos-hermanos", "madrigal-electromotive"]
+
+
+def test_match_names_parsed_and_normalized():
+    guide = parse_guide(FIXTURES / "guides" / "madrigal-electromotive.md")
+    assert guide.names == ("madrigal electromotive",)
+
+
+def test_guide_matchable_by_name_only(tmp_path):
+    (tmp_path / "name.md").write_text(
+        "---\nid: bodegas-alianza\ndescription: d\n"
+        "match:\n  names: [Bodegas Alianza]\n"
+        "portal_url: https://example.com/\n---\nhint\n",
+        encoding="utf-8",
+    )
+    g = parse_guide(tmp_path / "name.md")
+    assert g.names == ("bodegas alianza",)
+    assert g.domains == ()
+    assert g.rfcs == ()
+
+
+def test_empty_match_rejected(tmp_path):
+    (tmp_path / "empty.md").write_text(
+        "---\nid: e\ndescription: d\nmatch: {}\nportal_url: https://e.com/\n---\nx\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(GuideError) as exc:
+        parse_guide(tmp_path / "empty.md")
+    assert str(exc.value) == "empty.md: match must declare at least one domain, rfc, or name"
+
+
+def test_duplicate_name_claims_rejected(tmp_path):
+    for gid in ("krusty-burger", "krusty-clone"):
+        (tmp_path / f"{gid}.md").write_text(
+            f"---\nid: {gid}\ndescription: d\n"
+            "match:\n  names: [Krusty Burger]\n"
+            "portal_url: https://k.com/\n---\nx\n",
+            encoding="utf-8",
+        )
+    with pytest.raises(GuideError) as exc:
+        load_guides(tmp_path)
+    assert str(exc.value) == (
+        "duplicate match claims: name 'krusty burger' claimed by both "
+        "'krusty-burger' and 'krusty-clone'"
+    )
 
 
 def test_real_amorino_guide_ticket_field_map():

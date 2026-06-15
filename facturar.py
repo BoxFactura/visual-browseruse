@@ -86,8 +86,8 @@ def main() -> int:
         signals = extract_signals(ticket)
         result = match(signals, guides)
         if result.status == "conflict":
-            print(f"matching conflict: ticket domain and issuer RFC point at different guides "
-                  f"{result.candidates}. Resolve with --guide.")
+            print(f"matching conflict: the ticket's store name / RFC / domain point at "
+                  f"different guides {result.candidates}. Resolve with --guide.")
             return STATUS_EXIT_CODES["conflict"]
         if result.status == "no_match":
             # deterministic match missed — let the agent identify the store and pick a guide
