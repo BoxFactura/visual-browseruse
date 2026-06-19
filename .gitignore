@@ -1,5 +1,7 @@
-# sublex: ignore next
+# sublex: ignore next 2
 .env
+tickets/
+/*ticket*.json
 
 # Python
 __pycache__/
@@ -46,9 +48,6 @@ Thumbs.db
 
 # CFDI runner artifacts & PII
 runs/
-rfcs/
-tickets/
-/*ticket*.json
 guides/_drafts/
 
 # Spikes / scratch
