@@ -3,7 +3,8 @@
 Upload one ticket photo → OpenAI turns it into ticket JSON (with a top-level
 `facturadata` block) → we launch facturar.py on that JSON so the agent starts
 working. The receptor is chosen by RFC (rfcs/<RFC>.json) and the run honours the
-auto-submit / no-guide toggles.
+auto-submit / no-guide toggles. The page streams the agent's log and remembers
+the last RFC + flags you used (via localStorage — never the ticket image).
 
     uv run webapp.py            # serves http://127.0.0.1:5000
 """
@@ -34,6 +35,10 @@ TRANSCRIBE_PROMPT = (
 
 load_dotenv()
 app = Flask(__name__)
+
+# Launched agent processes, keyed by log filename, so /log can stream each run's
+# output and report when it finishes.
+RUNS: dict[str, subprocess.Popen] = {}
 
 
 def available_rfcs() -> list[str]:
@@ -77,11 +82,14 @@ PAGE = """<!doctype html>
   #preview { max-width: 100%; max-height: 240px; border-radius: 8px; display: none; margin-top: 1rem; }
   button { padding: .7rem 1rem; font-size: 1rem; border-radius: 8px; cursor: pointer; }
   #out { white-space: pre-wrap; background: #8881; padding: 1rem; border-radius: 8px; font-size: .85rem; }
+  #log { white-space: pre-wrap; background: #0b0b0b; color: #9fe69f; padding: 1rem; border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem;
+    max-height: 380px; overflow: auto; }
 </style>
 </head>
 <body>
 <h1>Ticket → CFDI invoice</h1>
-<form id="f">
+<form id="f" method="post" action="/run" enctype="multipart/form-data">
   <div class="drop">
     <input type="file" name="image" id="image" accept="image/*" required>
     <p>or drop a ticket image anywhere on the page</p>
@@ -97,42 +105,84 @@ PAGE = """<!doctype html>
   <button type="submit">Transcribe &amp; run agent</button>
 </form>
 <pre id="out" hidden></pre>
-<script>
+<pre id="log" hidden></pre>
+{% raw %}<script>
   const body = document.body, fileInput = document.getElementById('image'),
         preview = document.getElementById('preview'), form = document.getElementById('f'),
-        out = document.getElementById('out');
-  let depth = 0;
+        out = document.getElementById('out'), logEl = document.getElementById('log');
+  const PREFS_KEY = 'factura.prefs';
+
+  // remember the last RFC + flags (never the ticket image)
+  function loadPrefs() {
+    let p; try { p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch { p = {}; }
+    if (p.rfc && [...form.elements.rfc.options].some(o => o.value === p.rfc)) form.elements.rfc.value = p.rfc;
+    if ('auto_submit' in p) form.elements.auto_submit.checked = !!p.auto_submit;
+    if ('no_guide' in p) form.elements.no_guide.checked = !!p.no_guide;
+  }
+  function savePrefs() {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({
+        rfc: form.elements.rfc.value,
+        auto_submit: form.elements.auto_submit.checked,
+        no_guide: form.elements.no_guide.checked,
+      }));
+    } catch (e) { /* storage disabled — ignore */ }
+  }
   function showPreview(file) {
     if (!file) return;
     preview.src = URL.createObjectURL(file);
     preview.style.display = 'block';
   }
-  // Whole-page drop zone. A depth counter avoids flicker from nested dragenter/leave.
-  ['dragenter', 'dragover'].forEach(e => document.addEventListener(e, ev => ev.preventDefault()));
-  document.addEventListener('dragenter', () => { if (depth++ === 0) body.classList.add('dragging'); });
-  document.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; body.classList.remove('dragging'); } });
-  document.addEventListener('drop', ev => {
-    ev.preventDefault(); depth = 0; body.classList.remove('dragging');
-    const file = ev.dataTransfer.files[0];
-    if (!file) return;
-    const dt = new DataTransfer(); dt.items.add(file);
-    fileInput.files = dt.files;
-    showPreview(file);
-  });
-  fileInput.addEventListener('change', () => showPreview(fileInput.files[0]));
+  // stream the agent's log until its process exits
+  async function streamLog(name) {
+    logEl.hidden = false;
+    logEl.textContent = '(waiting for the agent to start…)';
+    while (true) {
+      let j;
+      try { j = await (await fetch('/log/' + encodeURIComponent(name))).json(); }
+      catch (e) { logEl.textContent += '\\n(log unavailable: ' + e + ')'; return; }
+      if (j.text) { logEl.textContent = j.text; logEl.scrollTop = logEl.scrollHeight; }
+      if (!j.running) { logEl.textContent += `\\n\\n— agent finished (exit ${j.returncode}) —`; return; }
+      await new Promise(res => setTimeout(res, 1500));
+    }
+  }
+
+  // Attach submit FIRST so nothing below can stop it from posting via fetch. The
+  // form also has method=post action=/run enctype=multipart as a no-JS fallback.
   form.addEventListener('submit', async ev => {
     ev.preventDefault();
     if (!fileInput.files[0]) { alert('Choose or drop a ticket image first.'); return; }
-    out.hidden = false; out.textContent = 'Transcribing the ticket and launching the agent…';
+    savePrefs();
+    out.hidden = false; logEl.hidden = true;
+    out.textContent = 'Transcribing the ticket and launching the agent…';
     try {
       const r = await fetch('/run', { method: 'POST', body: new FormData(form) });
       const j = await r.json();
-      out.textContent = r.ok
-        ? `✅ ${j.message}\n\ncommand: ${j.command}\nticket:  ${j.ticket_file}\nlog:     ${j.log_file}\n\n${JSON.stringify(j.ticket, null, 2)}`
-        : `❌ ${j.error}${j.raw ? '\n\n' + j.raw : ''}`;
+      if (!r.ok) { out.textContent = `❌ ${j.error}${j.raw ? '\\n\\n' + j.raw : ''}`; return; }
+      out.textContent = `✅ ${j.message}\\n\\ncommand: ${j.command}\\nticket:  ${j.ticket_file}\\nlog:     ${j.log_file}\\n\\n${JSON.stringify(j.ticket, null, 2)}`;
+      streamLog(j.log_file.split('/').pop());
     } catch (e) { out.textContent = '❌ ' + e; }
   });
-</script>
+
+  // Progressive enhancements — a failure here must never block submit.
+  try {
+    loadPrefs();
+    ['rfc', 'auto_submit', 'no_guide'].forEach(n => form.elements[n].addEventListener('change', savePrefs));
+    fileInput.addEventListener('change', () => showPreview(fileInput.files[0]));
+    let depth = 0;  // whole-page drop zone; counter avoids nested dragenter/leave flicker
+    ['dragenter', 'dragover'].forEach(e => document.addEventListener(e, ev => ev.preventDefault()));
+    document.addEventListener('dragenter', () => { if (depth++ === 0) body.classList.add('dragging'); });
+    document.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; body.classList.remove('dragging'); } });
+    document.addEventListener('drop', ev => {
+      ev.preventDefault(); depth = 0; body.classList.remove('dragging');
+      const file = ev.dataTransfer.files[0];
+      if (!file) return;
+      const dt = new DataTransfer(); dt.items.add(file);
+      fileInput.files = dt.files;
+      showPreview(file);
+    });
+  } catch (e) { console.error('enhancement init failed', e); }
+</script>{% endraw %}
 </body>
 </html>"""
 
@@ -185,11 +235,14 @@ def run():
         cmd.append("--no-guide")
     log_path = UPLOADS / f"{stamp}-{rfc}.log"
     # Fire-and-forget: the agent opens its own (headed) browser and runs for a while;
-    # the request returns the transcription immediately and the run logs to its file.
-    subprocess.Popen(cmd, cwd=str(BASE), stdout=open(log_path, "w"), stderr=subprocess.STDOUT)
+    # the request returns the transcription immediately, the run logs to its file, and
+    # the UI streams it via /log/<name> until the process exits.
+    RUNS[log_path.name] = subprocess.Popen(
+        cmd, cwd=str(BASE), stdout=open(log_path, "w"), stderr=subprocess.STDOUT
+    )
 
     return jsonify(
-        message="agent launched — watch the browser window",
+        message="agent launched — watch the browser window and the log below",
         ticket=ticket,
         ticket_file=str(ticket_path.relative_to(BASE)),
         log_file=str(log_path.relative_to(BASE)),
@@ -197,5 +250,19 @@ def run():
     )
 
 
+@app.get("/log/<name>")
+def log(name: str):
+    """Stream a run's log file and whether its process is still alive."""
+    if not re.fullmatch(r"[\w.-]+\.log", name):
+        return jsonify(error="bad log name"), 400
+    path = (UPLOADS / name).resolve()
+    if not str(path).startswith(str(UPLOADS.resolve()) + os.sep):
+        return jsonify(error="bad log name"), 400
+    text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+    proc = RUNS.get(name)
+    code = proc.poll() if proc else None
+    return jsonify(text=text, running=proc is not None and code is None, returncode=code)
+
+
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=int(os.getenv("PORT", "5000")))
+    app.run(host="127.0.0.1", port=int(os.getenv("PORT", "5000")), threaded=True)

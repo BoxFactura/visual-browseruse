@@ -30,7 +30,11 @@ def test_parse_json_rejects_non_object():
 def test_index_lists_rfcs_and_ships_both_flags_checked(client):
     html = client.get("/").get_data(as_text=True)
     assert "<option" in html
-    assert html.count("checked") == 2  # auto-submit + no-guide, both on by default
+    # both flags ship checked by default
+    assert '<input type="checkbox" name="auto_submit" checked>' in html
+    assert '<input type="checkbox" name="no_guide" checked>' in html
+    # fail-safe: the form posts to /run as multipart even if JS never runs
+    assert '<form id="f" method="post" action="/run" enctype="multipart/form-data">' in html
 
 
 def test_run_requires_an_image(client):
