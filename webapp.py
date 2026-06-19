@@ -25,12 +25,20 @@ from openai import OpenAI
 BASE = Path(__file__).parent
 UPLOADS = BASE / "uploads"
 
-# The transcription prompt is fixed: it must yield the standardized facturadata
-# block the matcher keys off (store_name, optional rfc). Everything else in the
-# ticket stays free-form — the invoicing agent figures it out.
+# The transcription prompt is fixed. It must (a) transcribe the WHOLE ticket so
+# the invoicing agent has every lookup field (serie, folio, billing code, total,
+# date, items…), and (b) add the standardized top-level facturadata block the
+# matcher keys off (store_name, optional rfc). Everything outside facturadata
+# stays free-form — the agent figures out which field means what.
 TRANSCRIBE_PROMPT = (
-    "convert this to a json file, it must include a top level item: facturadata; "
-    "it must have: store_name and optionally rfc"
+    "Transcribe this ticket image into a single JSON object. Include EVERY piece of "
+    "information visible on the ticket — store/merchant details, date and time, the "
+    "folio / ticket number and any billing or facturación code, every line item with "
+    "its quantity and prices, subtotal, taxes and total, payment info, and anything "
+    "else printed. Transcribe exactly what you see; do not omit fields and do not "
+    "invent values. In ADDITION, include a top-level key \"facturadata\" with "
+    "\"store_name\" (the merchant's name) and, only if the ticket shows it, \"rfc\" "
+    "(the merchant's RFC). Return only the JSON object."
 )
 
 load_dotenv()

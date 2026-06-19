@@ -2,7 +2,14 @@ import io
 
 import pytest
 
-from webapp import app, parse_json
+from webapp import app, parse_json, TRANSCRIBE_PROMPT
+
+
+def test_transcribe_prompt_requests_facturadata_and_full_ticket():
+    # the matcher depends on the facturadata block; the agent depends on the rest
+    assert "facturadata" in TRANSCRIBE_PROMPT
+    assert "store_name" in TRANSCRIBE_PROMPT
+    assert "EVERY" in TRANSCRIBE_PROMPT  # whole-ticket transcription, not just facturadata
 
 
 @pytest.fixture
