@@ -1,32 +1,41 @@
 import json
-from pathlib import Path
 
-from cfdi.runner import PAGE_MARKER_EXTENSION, _extension_args
+from cfdi.runner import (
+    USERSCRIPT_EXTENSION,
+    _build_and_inject_userscript,
+    _extension_args,
+)
 
 
-def test_marker_extension_is_unpacked_mv3_css():
-    manifest = json.loads((PAGE_MARKER_EXTENSION / "manifest.json").read_text(encoding="utf-8"))
+def test_injector_extension_is_unpacked_mv3_main_world_js():
+    manifest = json.loads((USERSCRIPT_EXTENSION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["manifest_version"] == 3
-    assert manifest["name"] == "CFDI Run Marker"
+    assert manifest["name"] == "CFDI Userscript Injector"
     assert manifest["content_scripts"] == [
         {
             "matches": ["<all_urls>"],
-            "css": ["border.css"],
-            "run_at": "document_start",
+            "js": ["browseruse.js"],
+            "run_at": "document_end",
+            "world": "MAIN",
             "all_frames": False,
         }
     ]
 
 
-def test_border_css_is_10px_solid_black():
-    css = (PAGE_MARKER_EXTENSION / "border.css").read_text(encoding="utf-8")
-    assert css == "body {\n  border: 10px solid black !important;\n}\n"
-
-
 def test_extension_args_load_only_our_extension():
-    ext = str(PAGE_MARKER_EXTENSION)
+    ext = str(USERSCRIPT_EXTENSION)
     assert _extension_args() == [
         "--enable-extensions",
         f"--disable-extensions-except={ext}",
         f"--load-extension={ext}",
     ]
+
+
+def test_build_and_inject_writes_comment_free_content_script():
+    _build_and_inject_userscript()
+    injected = USERSCRIPT_EXTENSION / "browseruse.js"
+    code = injected.read_text(encoding="utf-8")
+    # The userscript metadata header is stripped; only the minified body remains.
+    assert "==UserScript==" not in code
+    assert not code.lstrip().startswith("//")
+    assert "txt_cucfdi" in code  # the actual fix is present

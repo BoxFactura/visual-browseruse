@@ -9,6 +9,8 @@ the per-run values LAST.
 import asyncio
 import json
 import os
+import re
+import subprocess
 from datetime import date, datetime
 from pathlib import Path
 
@@ -81,13 +83,33 @@ def _strip_supervised_stop(body: str) -> str:
 
 PROFILES_DIR = "~/.config/browseruse/profiles"
 
-# Unpacked MV3 extension that draws a 10px black border on every page body — a
-# visual marker that you're looking at the automated browser, not a normal one.
-PAGE_MARKER_EXTENSION = Path(__file__).resolve().parent.parent / "extensions" / "page-border"
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+# Unpacked MV3 extension that injects our compiled userscript (per-portal page
+# fixes) into every page, in the page's MAIN world. Its content script
+# (browseruse.js) is built fresh on each run by _build_and_inject_userscript and
+# is gitignored — never commit the compiled bundle.
+USERSCRIPT_EXTENSION = _REPO_ROOT / "extensions" / "userscript"
+_USERSCRIPT_BUILD = _REPO_ROOT / "dist" / "browseruse.user.js"
+_INJECTED_SCRIPT = USERSCRIPT_EXTENSION / "browseruse.js"
+# Strip the // ==UserScript== ... ==/UserScript== metadata header; the extension
+# wants plain code, no comments. The minified body itself carries none.
+_USERSCRIPT_HEADER = re.compile(r"^//\s*==UserScript==.*?//\s*==/UserScript==\s*", re.DOTALL)
+
+
+def _build_and_inject_userscript() -> None:
+    """Compile js/ and drop the comment-free bundle into the extension as its
+    MAIN-world content script, so the injected fixes always match source."""
+    subprocess.run(
+        ["npm", "run", "build"],
+        cwd=_REPO_ROOT, check=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+    )
+    body = _USERSCRIPT_HEADER.sub("", _USERSCRIPT_BUILD.read_text(encoding="utf-8"), count=1)
+    _INJECTED_SCRIPT.write_text(body.lstrip(), encoding="utf-8")
 
 
 def _extension_args() -> list[str]:
-    """Chrome args that load ONLY our page-marker extension.
+    """Chrome args that load ONLY our userscript-injector extension.
 
     We own the extension args wholesale instead of adding to browser-use's
     bundled set: BrowserSession rebuilds the BrowserProfile from kwargs (so a
@@ -96,7 +118,7 @@ def _extension_args() -> list[str]:
     So we disable the default extensions (see enable_default_extensions=False)
     and supply the single --load-extension here. Chrome needs an absolute path.
     """
-    ext = str(PAGE_MARKER_EXTENSION)
+    ext = str(USERSCRIPT_EXTENSION)
     return [
         "--enable-extensions",
         f"--disable-extensions-except={ext}",
@@ -200,6 +222,7 @@ def run_agent(guide: Guide, ticket: dict, fiscal: dict, *, headless: bool, model
               auto_submit: bool = False, trace=None) -> dict:
     """Run the browser agent. Returns the report dict (status + payload).
     trace: optional StepTrace whose callback records each step for refinement."""
+    _build_and_inject_userscript()
     browser = Browser(
         headless=headless,
         keep_alive=True,

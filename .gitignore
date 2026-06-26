@@ -36,6 +36,9 @@ env/
 # Node
 node_modules/
 
+# Compiled userscript injected into the extension at run time — never commit it
+extensions/userscript/browseruse.js
+
 # IDE
 .vscode/
 .idea/

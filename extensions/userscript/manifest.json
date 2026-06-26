@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "CFDI Userscript Injector",
+  "version": "1.0.0",
+  "description": "Injects the compiled visual-browseruse userscript (per-portal page fixes for automated invoicing runs) into every page, in the page's MAIN world.",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["browseruse.js"],
+      "run_at": "document_end",
+      "world": "MAIN",
+      "all_frames": false
+    }
+  ]
+}
