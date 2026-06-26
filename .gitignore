@@ -1,7 +1,9 @@
-# sublex: ignore next 2
+# sublex: ignore next 5
 .env
 tickets/
+dist/
 /*ticket*.json
+uploads/
 
 # Python
 __pycache__/
@@ -11,7 +13,6 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -31,6 +32,9 @@ venv/
 ENV/
 env/
 
+
+# Node
+node_modules/
 
 # IDE
 .vscode/

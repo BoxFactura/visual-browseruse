@@ -1,0 +1,20 @@
+{
+  "name": "visual-browseruse-userscripts",
+  "version": "1.0.0",
+  "author": "Rafael Soto <rafael@osom.so>",
+  "license": "MIT",
+  "description": "Userscripts for visual-browseruse",
+  "scripts": {
+    "dev": "webpack && webpack-cli serve -w --no-hot",
+    "build": "webpack"
+  },
+  "devDependencies": {
+    "webpack": "^5.108.1",
+    "webpack-cli": "^7.1.0",
+    "webpack-dev-server": "^5.2.5",
+    "webpack-userscript": "^3.2.3"
+  },
+  "dependencies": {
+    "spect": "^24.2.1"
+  }
+}
